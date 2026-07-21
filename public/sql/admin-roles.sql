@@ -70,8 +70,20 @@ USING (true);
 CREATE POLICY "Admin manages portal settings"
 ON public.portal_settings FOR ALL
 TO authenticated
-USING (lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechiukwuifunanya@gmail.com'))
-WITH CHECK (lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechiukwuifunanya@gmail.com'));
+USING (
+  lower(auth.jwt() ->> 'email') = 'regaltulipschool@gmail.com'
+  OR (
+    lower(auth.jwt() ->> 'email') = 'ogechiukwuifunanya@gmail.com'
+    AND key <> 'staff_access_enabled'
+  )
+)
+WITH CHECK (
+  lower(auth.jwt() ->> 'email') = 'regaltulipschool@gmail.com'
+  OR (
+    lower(auth.jwt() ->> 'email') = 'ogechiukwuifunanya@gmail.com'
+    AND key <> 'staff_access_enabled'
+  )
+);
 
 DROP POLICY IF EXISTS "Authenticated users can read staff access" ON public.staff_access;
 DROP POLICY IF EXISTS "Admin manages staff access" ON public.staff_access;

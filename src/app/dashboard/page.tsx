@@ -9,7 +9,7 @@ import PrimaryAssessmentTemplate from "@/components/PrimaryAssessmentTemplate";
 import PrimaryThirdTermTemplate from "@/components/PrimaryThirdTermTemplate";
 import type { AssessmentResult } from "@/types/assessment";
 import { getStaffClasses } from "@/lib/staffClassAccess";
-import { isPortalAdmin } from "@/lib/portalAdmins";
+import { canControlStaffAccess, isPortalAdmin } from "@/lib/portalAdmins";
 
 const termOptions = [
   { value: "1st Term", label: "1st Term" },
@@ -52,6 +52,7 @@ export default function DashboardPage() {
   const [entryStateReady, setEntryStateReady] = useState(false);
   const normalizedUserEmail = user?.email?.trim().toLowerCase() ?? "";
   const isAdmin = Boolean(user) && isPortalAdmin(normalizedUserEmail);
+  const mayControlStaffAccess = Boolean(user) && canControlStaffAccess(normalizedUserEmail);
   const assignedClasses = getStaffClasses(normalizedUserEmail);
   const assignedClass = assignedClasses[0];
 
@@ -545,8 +546,8 @@ export default function DashboardPage() {
   }
 
   async function handleAccessToggle() {
-    if (!isAdmin) {
-      setAccessMessage("Only the administrator can change staff access.");
+    if (!mayControlStaffAccess) {
+      setAccessMessage("Only the primary administrator can lock or unlock staff access.");
       return;
     }
     if (!supabase) return;
@@ -740,7 +741,7 @@ export default function DashboardPage() {
               </div>
               <div className="no-print flex flex-wrap gap-2">
                 <button onClick={handleSignOut} className="rounded-full border border-red-400/60 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-200 hover:bg-red-500/20">Sign out</button>
-                {isAdmin && (
+                {mayControlStaffAccess && (
                   <button onClick={handleAccessToggle} className="rounded-full bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700">
                     {staffAccessEnabled ? "Lock staff access" : "Unlock staff access"}
                   </button>
