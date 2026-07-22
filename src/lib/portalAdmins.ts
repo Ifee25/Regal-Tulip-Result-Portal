@@ -1,6 +1,6 @@
 export const PORTAL_ADMIN_EMAILS = [
   "regaltulipschool@gmail.com",
-  "ogechiukwuifunanya@gmail.com",
+  "ogechukwuifunanya@gmail.com",
 ] as const;
 
 export const PRIMARY_ADMIN_EMAIL = "regaltulipschool@gmail.com";

@@ -48,7 +48,9 @@ INSERT INTO public.staff_class_assignments (email, class_name) VALUES
   ('enibejennifer33@gmail.com', 'Primary 1T'),
   ('giftchidimma0224@gmail.com', 'Primary 3T'),
   ('kelechukwuchidimma32@gmail.com', 'Primary 4R'),
-  ('kinkymomee352@gmail.com', 'Primary 1R')
+  ('kinkymomee352@gmail.com', 'Primary 1R'),
+  ('ezeibeoluebube2@gmail.com', 'Primary 2R'),
+  ('sandrauzoigwe@gmail.com', 'Nursery 2R')
 ON CONFLICT (email, class_name) DO UPDATE SET active = TRUE;
 
 CREATE OR REPLACE FUNCTION public.is_staff_portal_email_allowed(candidate_email TEXT)
@@ -59,7 +61,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
   SELECT
-    lower(candidate_email) IN ('regaltulipschool@gmail.com', 'ogechiukwuifunanya@gmail.com')
+    lower(candidate_email) IN ('regaltulipschool@gmail.com', 'ogechukwuifunanya@gmail.com')
     OR EXISTS (
       SELECT 1 FROM public.staff_class_assignments
       WHERE lower(email) = lower(candidate_email) AND active
@@ -107,7 +109,7 @@ BEGIN
     ));
   END IF;
 
-  IF signup_email NOT IN ('regaltulipschool@gmail.com', 'ogechiukwuifunanya@gmail.com')
+  IF signup_email NOT IN ('regaltulipschool@gmail.com', 'ogechukwuifunanya@gmail.com')
      AND NOT EXISTS (
        SELECT 1 FROM public.staff_class_assignments
        WHERE lower(email) = signup_email AND active
@@ -137,7 +139,7 @@ WITH CHECK (
   AND NOT public.is_email_blocked(auth.jwt() ->> 'email')
   AND coalesce(auth.jwt() -> 'user_metadata' ->> 'portal_role', 'staff') <> 'guardian'
   AND (
-    lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechiukwuifunanya@gmail.com')
+    lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechukwuifunanya@gmail.com')
     OR (
       EXISTS (
         SELECT 1 FROM public.portal_settings

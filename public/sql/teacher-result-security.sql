@@ -50,7 +50,7 @@ CREATE POLICY "Teachers view own results and admin views all"
 ON public.students FOR SELECT
 TO authenticated
 USING (
-  lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechiukwuifunanya@gmail.com')
+  lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechukwuifunanya@gmail.com')
   OR uploaded_by = auth.uid()
 );
 
@@ -65,7 +65,7 @@ WITH CHECK (
   AND NOT public.is_email_blocked(auth.jwt() ->> 'email')
   AND coalesce(auth.jwt() -> 'user_metadata' ->> 'portal_role', 'staff') <> 'guardian'
   AND (
-    lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechiukwuifunanya@gmail.com')
+    lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechukwuifunanya@gmail.com')
     OR (
       EXISTS (
         SELECT 1 FROM public.portal_settings
@@ -81,15 +81,15 @@ DROP POLICY IF EXISTS "Only admin can update results" ON public.students;
 CREATE POLICY "Only admin can update results"
 ON public.students FOR UPDATE
 TO authenticated
-USING (lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechiukwuifunanya@gmail.com'))
-WITH CHECK (lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechiukwuifunanya@gmail.com'));
+USING (lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechukwuifunanya@gmail.com'))
+WITH CHECK (lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechukwuifunanya@gmail.com'));
 
 DROP POLICY IF EXISTS "Authenticated staff can delete results" ON public.students;
 DROP POLICY IF EXISTS "Only admin can delete results" ON public.students;
 CREATE POLICY "Only admin can delete results"
 ON public.students FOR DELETE
 TO authenticated
-USING (lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechiukwuifunanya@gmail.com'));
+USING (lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechukwuifunanya@gmail.com'));
 
 -- Teachers may see only their own access grant; the administrator sees all grants.
 DROP POLICY IF EXISTS "Authenticated users can read staff access" ON public.staff_access;
@@ -98,7 +98,7 @@ CREATE POLICY "Teachers read own access and admin reads all"
 ON public.staff_access FOR SELECT
 TO authenticated
 USING (
-  lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechiukwuifunanya@gmail.com')
+  lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechukwuifunanya@gmail.com')
   OR lower(email) = lower(auth.jwt() ->> 'email')
 );
 

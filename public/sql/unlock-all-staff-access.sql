@@ -14,7 +14,7 @@ WITH CHECK (
   AND NOT public.is_email_blocked(auth.jwt() ->> 'email')
   AND coalesce(auth.jwt() -> 'user_metadata' ->> 'portal_role', 'staff') <> 'guardian'
   AND (
-    lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechiukwuifunanya@gmail.com')
+    lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechukwuifunanya@gmail.com')
     OR (
       EXISTS (
         SELECT 1 FROM public.portal_settings

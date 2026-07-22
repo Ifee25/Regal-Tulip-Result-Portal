@@ -1,7 +1,30 @@
--- Grant full portal administration rights to the two protected admin emails.
--- Run this file LAST in the Supabase SQL Editor after the other portal SQL files.
+-- Correct the second administrator email and add two staff class assignments.
+-- Run this entire file once in the Supabase SQL Editor.
 
--- Permit the second administrator to create an account through the existing hook.
+INSERT INTO public.staff_class_assignments (email, class_name, active) VALUES
+  ('ezeibeoluebube2@gmail.com', 'Primary 2R', TRUE),
+  ('sandrauzoigwe@gmail.com', 'Nursery 2R', TRUE)
+ON CONFLICT (email, class_name) DO UPDATE SET active = TRUE;
+
+CREATE OR REPLACE FUNCTION public.is_staff_portal_email_allowed(candidate_email TEXT)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT
+    lower(candidate_email) IN ('regaltulipschool@gmail.com', 'ogechukwuifunanya@gmail.com')
+    OR EXISTS (
+      SELECT 1 FROM public.staff_class_assignments
+      WHERE lower(email) = lower(candidate_email) AND active
+    )
+    OR EXISTS (
+      SELECT 1 FROM public.grandfathered_staff_accounts
+      WHERE lower(email) = lower(candidate_email)
+    );
+$$;
+
 CREATE OR REPLACE FUNCTION public.hook_block_deleted_emails(event JSONB)
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -38,8 +61,7 @@ REVOKE EXECUTE ON FUNCTION public.hook_block_deleted_emails(JSONB) FROM anon, au
 
 DROP POLICY IF EXISTS "Teachers view own results and admin views all" ON public.students;
 CREATE POLICY "Teachers view own results and admin views all"
-ON public.students FOR SELECT
-TO authenticated
+ON public.students FOR SELECT TO authenticated
 USING (
   lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechukwuifunanya@gmail.com')
   OR uploaded_by = auth.uid()
@@ -49,8 +71,7 @@ DROP POLICY IF EXISTS "Authorized staff can upload results" ON public.students;
 DROP POLICY IF EXISTS "Authorized staff can upload own results" ON public.students;
 DROP POLICY IF EXISTS "Assigned staff can upload own class results" ON public.students;
 CREATE POLICY "Assigned staff can upload own class results"
-ON public.students FOR INSERT
-TO authenticated
+ON public.students FOR INSERT TO authenticated
 WITH CHECK (
   uploaded_by = auth.uid()
   AND lower(uploaded_by_email) = lower(auth.jwt() ->> 'email')
@@ -70,21 +91,19 @@ WITH CHECK (
 
 DROP POLICY IF EXISTS "Only admin can update results" ON public.students;
 CREATE POLICY "Only admin can update results"
-ON public.students FOR UPDATE
-TO authenticated
+ON public.students FOR UPDATE TO authenticated
 USING (lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechukwuifunanya@gmail.com'))
 WITH CHECK (lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechukwuifunanya@gmail.com'));
 
 DROP POLICY IF EXISTS "Only admin can delete results" ON public.students;
 CREATE POLICY "Only admin can delete results"
-ON public.students FOR DELETE
-TO authenticated
+ON public.students FOR DELETE TO authenticated
 USING (lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechukwuifunanya@gmail.com'));
 
+-- The original admin remains the only account allowed to lock/unlock staff access.
 DROP POLICY IF EXISTS "Admin manages portal settings" ON public.portal_settings;
 CREATE POLICY "Admin manages portal settings"
-ON public.portal_settings FOR ALL
-TO authenticated
+ON public.portal_settings FOR ALL TO authenticated
 USING (
   lower(auth.jwt() ->> 'email') = 'regaltulipschool@gmail.com'
   OR (
@@ -102,15 +121,13 @@ WITH CHECK (
 
 DROP POLICY IF EXISTS "Admin manages staff access" ON public.staff_access;
 CREATE POLICY "Admin manages staff access"
-ON public.staff_access FOR ALL
-TO authenticated
+ON public.staff_access FOR ALL TO authenticated
 USING (lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechukwuifunanya@gmail.com'))
 WITH CHECK (lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechukwuifunanya@gmail.com'));
 
 DROP POLICY IF EXISTS "Teachers read own access and admin reads all" ON public.staff_access;
 CREATE POLICY "Teachers read own access and admin reads all"
-ON public.staff_access FOR SELECT
-TO authenticated
+ON public.staff_access FOR SELECT TO authenticated
 USING (
   lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechukwuifunanya@gmail.com')
   OR lower(email) = lower(auth.jwt() ->> 'email')

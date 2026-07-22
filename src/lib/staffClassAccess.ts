@@ -18,6 +18,8 @@ export const STAFF_CLASS_ASSIGNMENTS: Readonly<Record<string, readonly string[]>
   "giftchidimma0224@gmail.com": ["Primary 3T"],
   "kelechukwuchidimma32@gmail.com": ["Primary 4R"],
   "kinkymomee352@gmail.com": ["Primary 1R"],
+  "ezeibeoluebube2@gmail.com": ["Primary 2R"],
+  "sandrauzoigwe@gmail.com": ["Nursery 2R"],
 };
 
 export function getStaffClasses(email?: string | null): readonly string[] {

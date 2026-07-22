@@ -1,5 +1,5 @@
 -- Regal Tulip role-based access policies
--- Administrators: regaltulipschool@gmail.com and ogechiukwuifunanya@gmail.com
+-- Administrators: regaltulipschool@gmail.com and ogechukwuifunanya@gmail.com
 
 GRANT USAGE ON SCHEMA public TO anon, authenticated;
 GRANT SELECT ON public.students TO anon, authenticated;
@@ -37,7 +37,7 @@ CREATE POLICY "Authorized staff can upload results"
 ON public.students FOR INSERT
 TO authenticated
 WITH CHECK (
-  lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechiukwuifunanya@gmail.com')
+  lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechukwuifunanya@gmail.com')
   OR (
     EXISTS (
       SELECT 1 FROM public.portal_settings
@@ -53,13 +53,13 @@ WITH CHECK (
 CREATE POLICY "Only admin can update results"
 ON public.students FOR UPDATE
 TO authenticated
-USING (lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechiukwuifunanya@gmail.com'))
-WITH CHECK (lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechiukwuifunanya@gmail.com'));
+USING (lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechukwuifunanya@gmail.com'))
+WITH CHECK (lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechukwuifunanya@gmail.com'));
 
 CREATE POLICY "Only admin can delete results"
 ON public.students FOR DELETE
 TO authenticated
-USING (lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechiukwuifunanya@gmail.com'));
+USING (lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechukwuifunanya@gmail.com'));
 
 DROP POLICY IF EXISTS "Authenticated users can read portal settings" ON public.portal_settings;
 DROP POLICY IF EXISTS "Admin manages portal settings" ON public.portal_settings;
@@ -73,14 +73,14 @@ TO authenticated
 USING (
   lower(auth.jwt() ->> 'email') = 'regaltulipschool@gmail.com'
   OR (
-    lower(auth.jwt() ->> 'email') = 'ogechiukwuifunanya@gmail.com'
+    lower(auth.jwt() ->> 'email') = 'ogechukwuifunanya@gmail.com'
     AND key <> 'staff_access_enabled'
   )
 )
 WITH CHECK (
   lower(auth.jwt() ->> 'email') = 'regaltulipschool@gmail.com'
   OR (
-    lower(auth.jwt() ->> 'email') = 'ogechiukwuifunanya@gmail.com'
+    lower(auth.jwt() ->> 'email') = 'ogechukwuifunanya@gmail.com'
     AND key <> 'staff_access_enabled'
   )
 );
@@ -94,5 +94,5 @@ USING (true);
 CREATE POLICY "Admin manages staff access"
 ON public.staff_access FOR ALL
 TO authenticated
-USING (lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechiukwuifunanya@gmail.com'))
-WITH CHECK (lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechiukwuifunanya@gmail.com'));
+USING (lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechukwuifunanya@gmail.com'))
+WITH CHECK (lower(auth.jwt() ->> 'email') IN ('regaltulipschool@gmail.com', 'ogechukwuifunanya@gmail.com'));

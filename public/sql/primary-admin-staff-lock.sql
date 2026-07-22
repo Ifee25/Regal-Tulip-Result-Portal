@@ -8,14 +8,14 @@ TO authenticated
 USING (
   lower(auth.jwt() ->> 'email') = 'regaltulipschool@gmail.com'
   OR (
-    lower(auth.jwt() ->> 'email') = 'ogechiukwuifunanya@gmail.com'
+    lower(auth.jwt() ->> 'email') = 'ogechukwuifunanya@gmail.com'
     AND key <> 'staff_access_enabled'
   )
 )
 WITH CHECK (
   lower(auth.jwt() ->> 'email') = 'regaltulipschool@gmail.com'
   OR (
-    lower(auth.jwt() ->> 'email') = 'ogechiukwuifunanya@gmail.com'
+    lower(auth.jwt() ->> 'email') = 'ogechukwuifunanya@gmail.com'
     AND key <> 'staff_access_enabled'
   )
 );
