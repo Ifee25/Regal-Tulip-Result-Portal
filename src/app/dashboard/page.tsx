@@ -34,8 +34,6 @@ export default function DashboardPage() {
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [resultsMessage, setResultsMessage] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ student_name: "", class_name: "", term: "", average_score: "" });
   const [form, setForm] = useState({ student_name: "", session: "2025/2026" });
   const [selectedTerm, setSelectedTerm] = useState(termOptions[0].value);
   const [selectedSection, setSelectedSection] = useState<"Nursery" | "Primary">("Nursery");
@@ -55,6 +53,14 @@ export default function DashboardPage() {
   const mayControlStaffAccess = Boolean(user) && canControlStaffAccess(normalizedUserEmail);
   const assignedClasses = getStaffClasses(normalizedUserEmail);
   const assignedClass = assignedClasses[0];
+  const isNurseryResult = (row: { assessment_data?: unknown; class_name?: unknown }) => {
+    try {
+      const assessment = typeof row.assessment_data === "string" ? JSON.parse(row.assessment_data) : row.assessment_data;
+      return assessment?.section === "Nursery" || String(row.class_name ?? "").startsWith("Nursery");
+    } catch {
+      return String(row.class_name ?? "").startsWith("Nursery");
+    }
+  };
 
   function readLocalResults(): any[] {
     if (typeof window === "undefined") return [];
@@ -364,7 +370,7 @@ export default function DashboardPage() {
       return;
     }
 
-    // Calculate average score from all assessments
+    // Nursery reports use developmental ratings, not academic averages.
     const averageScore = result.section === "Primary"
       ? (() => {
           const totals = (result.primary_subjects ?? [])
@@ -372,11 +378,7 @@ export default function DashboardPage() {
             .map((subject) => subject.total as number);
           return totals.length ? Math.round(totals.reduce((a, b) => a + b, 0) / totals.length) : 0;
         })()
-      : (() => {
-          const allScores = result.assessments.flatMap((cat) => cat.items.map((item) => item.score ?? 0));
-          const validScores = allScores.filter((score) => score > 0);
-          return validScores.length ? Math.round((validScores.reduce((a, b) => a + b, 0) / validScores.length / 5) * 100) : 0;
-        })();
+      : 0;
 
     const payload = {
       student_name: result.student_name,
@@ -455,52 +457,6 @@ export default function DashboardPage() {
     setShowAssessmentTemplate(false);
   }
 
-  function startEdit(row: any) {
-    if (!isAdmin) {
-      setAccessMessage("Only the administrator can edit results.");
-      return;
-    }
-    setEditingId(row.id);
-    setEditForm({
-      student_name: row.student_name || "",
-      class_name: row.class_name || "",
-      term: row.term || "",
-      average_score: String(row.average_score ?? ""),
-    });
-  }
-
-  async function saveEdit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!isAdmin) return;
-    if (!editingId) return;
-    const payload = { ...editForm, average_score: Number(editForm.average_score) };
-    if (editingId.startsWith("local-")) {
-      const current = results.find((row) => row.id === editingId);
-      if (!current) return;
-      const updated = { ...current, ...payload };
-      window.localStorage.setItem(`regal-tulip-result:${editingId}`, JSON.stringify(updated));
-      setResults((rows) => rows.map((row) => row.id === editingId ? updated : row));
-      setEditingId(null);
-      setEditForm({ student_name: "", class_name: "", term: "", average_score: "" });
-      setResultsMessage("Result updated in this browser.");
-      return;
-    }
-    if (!supabase) {
-      setResultsMessage("Could not update this database result because Supabase is unavailable.");
-      return;
-    }
-    const { error } = await supabase.from("students").update(payload).eq("id", editingId);
-    if (error) {
-      console.error(error);
-      setResultsMessage(`Could not update the result: ${error.message}`);
-      return;
-    }
-    setEditingId(null);
-    setEditForm({ student_name: "", class_name: "", term: "", average_score: "" });
-    await fetchResults();
-    setResultsMessage("Result updated successfully.");
-  }
-
   async function handleDelete(id: string) {
     if (!isAdmin) {
       setAccessMessage("Only the administrator can delete results.");
@@ -527,8 +483,9 @@ export default function DashboardPage() {
     setResultsMessage("Result deleted successfully.");
   }
 
-  const averageScore = results.length
-    ? Math.round(results.reduce((sum, row) => sum + Number(row.average_score || 0), 0) / results.length)
+  const primaryResults = results.filter((row) => !isNurseryResult(row));
+  const averageScore = primaryResults.length
+    ? Math.round(primaryResults.reduce((sum, row) => sum + Number(row.average_score || 0), 0) / primaryResults.length)
     : 0;
 
   const STAFF_ACCESS_CODE = "school2026";
@@ -847,41 +804,23 @@ export default function DashboardPage() {
                     {results.map((r) => (
                       <tr key={r.id} className="hover:bg-slate-50">
                         <td className="px-4 py-3">
-                          {editingId === r.id ? (
-                            <input value={editForm.student_name} onChange={(e) => setEditForm({ ...editForm, student_name: e.target.value })} className="w-full rounded border border-slate-200 px-2 py-1" />
-                          ) : (
-                            r.student_name
-                          )}
+                          {r.student_name}
                         </td>
                         <td className="px-4 py-3">
-                          {editingId === r.id ? (
-                            <input value={editForm.class_name} onChange={(e) => setEditForm({ ...editForm, class_name: e.target.value })} className="w-full rounded border border-slate-200 px-2 py-1" />
-                          ) : (
-                            r.class_name
-                          )}
+                          {r.class_name}
                         </td>
                         <td className="px-4 py-3">
-                          {editingId === r.id ? (
-                            <input value={editForm.term} onChange={(e) => setEditForm({ ...editForm, term: e.target.value })} className="w-full rounded border border-slate-200 px-2 py-1" />
-                          ) : (
-                            r.term
-                          )}
+                          {r.term}
                         </td>
                         <td className="px-4 py-3 font-semibold text-emerald-600">
-                          {editingId === r.id ? (
-                            <input value={editForm.average_score} onChange={(e) => setEditForm({ ...editForm, average_score: e.target.value })} className="w-20 rounded border border-slate-200 px-2 py-1" />
+                          {isNurseryResult(r) ? (
+                            "—"
                           ) : (
                             `${r.average_score}%`
                           )}
                         </td>
                         <td className="px-4 py-3 text-right">
-                          {editingId === r.id ? (
-                            <div className="flex justify-end gap-2">
-                              <button onClick={saveEdit} className="rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white">Save</button>
-                              <button onClick={() => setEditingId(null)} className="rounded border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700">Cancel</button>
-                            </div>
-                          ) : (
-                            <div className="flex justify-end gap-2">
+                          <div className="flex justify-end gap-2">
                               <Link href={`/results/${r.id}`} onClick={() => {
                                 try {
                                   const prefix = String(r.id).startsWith("local-") ? "regal-tulip-result:" : "regal-tulip-review:";
@@ -890,10 +829,16 @@ export default function DashboardPage() {
                                   // The review page will retrieve the record from Supabase.
                                 }
                               }} className="rounded border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">View</Link>
-                              {isAdmin && <button onClick={() => startEdit(r)} className="rounded border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Edit</button>}
+                              <Link href={`/results/${r.id}?edit=1`} onClick={() => {
+                                try {
+                                  const prefix = String(r.id).startsWith("local-") ? "regal-tulip-result:" : "regal-tulip-review:";
+                                  window.localStorage.setItem(`${prefix}${r.id}`, JSON.stringify(r));
+                                } catch {
+                                  // The editor will retrieve the record from Supabase.
+                                }
+                              }} className="rounded bg-sky-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-800">Edit</Link>
                               {isAdmin && <button onClick={() => handleDelete(r.id)} className="rounded bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700">Delete</button>}
-                            </div>
-                          )}
+                          </div>
                         </td>
                       </tr>
                     ))}

@@ -15,6 +15,8 @@ interface Props {
   initialResult?: AssessmentResult;
   readOnly?: boolean;
   draftKey?: string;
+  onEdit?: () => void;
+  submitLabel?: string;
 }
 
 type Info = {
@@ -27,7 +29,7 @@ type Info = {
 
 const pageOne = new Set(["NUMERACY", "VERBAL DEVELOPMENT", "WRITING"]);
 
-export default function AssessmentTemplate({ student_name, session, term, class_name, section, onSubmit, onCancel, initialResult, readOnly = false, draftKey }: Props) {
+export default function AssessmentTemplate({ student_name, session, term, class_name, section, onSubmit, onCancel, initialResult, readOnly = false, draftKey, onEdit, submitLabel = "Submit Result" }: Props) {
   const [assessments, setAssessments] = useState<AssessmentCategory[]>(
     (initialResult?.assessments?.length ? initialResult.assessments : NURSERY_ASSESSMENTS).map((category) => ({
       ...category,
@@ -150,8 +152,9 @@ export default function AssessmentTemplate({ student_name, session, term, class_
           <button type="button" onClick={cancel} className="min-h-11 w-full rounded-lg border border-slate-400 bg-white px-5 py-2 text-sm font-semibold sm:w-auto">{readOnly ? "Back to Results" : "Cancel"}</button>
           <div className="grid grid-cols-1 gap-3 min-[390px]:grid-cols-2">
             <button type="button" onClick={() => window.print()} className="min-h-11 rounded-lg bg-emerald-700 px-6 py-2 text-sm font-semibold text-white">Print Result</button>
+            {readOnly && onEdit && <button type="button" onClick={onEdit} className="min-h-11 rounded-lg bg-sky-700 px-6 py-2 text-sm font-semibold text-white">Edit Result</button>}
             {!readOnly && <button type="submit" disabled={loading} className="min-h-11 rounded-lg bg-sky-700 px-6 py-2 text-sm font-semibold text-white disabled:opacity-60">
-              {loading ? "Submitting..." : "Submit Result"}
+              {loading ? "Saving..." : submitLabel}
             </button>}
           </div>
         </div>

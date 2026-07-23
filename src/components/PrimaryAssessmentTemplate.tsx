@@ -22,6 +22,8 @@ type Props = {
   initialResult?: AssessmentResult;
   readOnly?: boolean;
   draftKey?: string;
+  onEdit?: () => void;
+  submitLabel?: string;
 };
 
 const emptySubjects = (): PrimarySubjectResult[] =>
@@ -31,7 +33,7 @@ const emptyRatings = (labels: readonly string[]): PrimaryRating[] =>
 
 const numberValue = (value: string) => value === "" ? undefined : Number(value);
 
-export default function PrimaryAssessmentTemplate({ student_name, session, term, class_name, onSubmit, onCancel, initialResult, readOnly = false, draftKey }: Props) {
+export default function PrimaryAssessmentTemplate({ student_name, session, term, class_name, onSubmit, onCancel, initialResult, readOnly = false, draftKey, onEdit, submitLabel = "Submit Result" }: Props) {
   const [subjects, setSubjects] = useState(() => initialResult?.primary_subjects?.length ? initialResult.primary_subjects : emptySubjects());
   const [affectiveTraits, setAffectiveTraits] = useState(() => initialResult?.affective_traits?.length ? initialResult.affective_traits : emptyRatings(PRIMARY_AFFECTIVE_TRAITS));
   const [psychomotorSkills, setPsychomotorSkills] = useState(() => initialResult?.psychomotor_skills?.length ? initialResult.psychomotor_skills : emptyRatings(PRIMARY_PSYCHOMOTOR_SKILLS));
@@ -130,7 +132,7 @@ export default function PrimaryAssessmentTemplate({ student_name, session, term,
     </label>
   );
   const scoreInput = (row: number, key: keyof PrimarySubjectResult, max?: number) => (
-    <input type={key === "cat" || key === "exam" ? "text" : "number"} inputMode={key === "cat" || key === "exam" ? "numeric" : undefined} min={0} max={max} value={subjects[row].not_offered && (key === "cat" || key === "exam") ? "NIL" : subjects[row][key] as number | undefined ?? ""} onChange={(e) => updateSubject(row, key, e.target.value)} className="h-full w-full bg-transparent px-1 text-center outline-none" />
+    <input type={key === "cat" || key === "exam" ? "text" : "number"} inputMode={key === "cat" || key === "exam" ? "numeric" : undefined} min={0} max={max} value={subjects[row].not_offered && (key === "cat" || key === "exam") ? "N/A" : subjects[row][key] as number | undefined ?? ""} onChange={(e) => updateSubject(row, key, e.target.value)} className="h-full w-full bg-transparent px-1 text-center outline-none" />
   );
 
   return (
@@ -169,7 +171,7 @@ export default function PrimaryAssessmentTemplate({ student_name, session, term,
                 const psychomotorIndex = index - 13;
                 const psychomotor = psychomotorSkills[psychomotorIndex];
                 return <tr key={row.subject} className="h-7">
-                  <td className="border border-black px-3 font-medium">{row.subject}</td><td className="border border-black">{scoreInput(index, "cat", 40)}</td><td className="border border-black">{scoreInput(index, "exam", 60)}</td><td className="border border-black text-center">{row.not_offered ? "NIL" : totals[index] || ""}</td><td className="border border-black">{scoreInput(index, "class_highest_score", 100)}</td><td className="border border-black">{scoreInput(index, "class_lowest_score", 100)}</td><td className="border border-black px-1 text-center text-[12px] font-semibold">{row.not_offered ? "NIL" : getPrimaryRemark(totals[index], row.cat !== undefined || row.exam !== undefined)}</td>
+                  <td className="border border-black px-3 font-medium">{row.subject}</td><td className="border border-black">{scoreInput(index, "cat", 40)}</td><td className="border border-black">{scoreInput(index, "exam", 60)}</td><td className="border border-black text-center">{row.not_offered ? "N/A" : totals[index] || ""}</td><td className="border border-black">{scoreInput(index, "class_highest_score", 100)}</td><td className="border border-black">{scoreInput(index, "class_lowest_score", 100)}</td><td className="border border-black px-1 text-center text-[12px] font-semibold">{row.not_offered ? "N/A" : getPrimaryRemark(totals[index], row.cat !== undefined || row.exam !== undefined)}</td>
                   <td className={`border border-black px-4 ${index === 12 ? "font-bold" : ""}`}>{index === 11 ? "" : index === 12 ? "PSYCHOMOTOR SKILLS" : affective?.label ?? psychomotor?.label ?? ""}</td>
                   <td className="border border-black">{affective ? <select aria-label={`${affective.label} rating`} value={affective.rating ?? ""} onChange={(e) => updateRating("affective", index, e.target.value)} className="rating-select h-full w-full bg-transparent text-center outline-none"><option value="" /><option>A</option><option>B</option><option>C</option></select> : psychomotor ? <select aria-label={`${psychomotor.label} rating`} value={psychomotor.rating ?? ""} onChange={(e) => updateRating("psychomotor", psychomotorIndex, e.target.value)} className="rating-select h-full w-full bg-transparent text-center outline-none"><option value="" /><option>A</option><option>B</option><option>C</option></select> : null}</td>
                 </tr>;
@@ -194,7 +196,8 @@ export default function PrimaryAssessmentTemplate({ student_name, session, term,
         <div className="no-print mt-4 grid gap-3 sm:flex sm:flex-wrap sm:justify-end">
           <button type="button" onClick={cancel} className="min-h-11 rounded-lg border border-slate-400 bg-white px-6 py-3 font-semibold">{readOnly ? "Back to Results" : "Cancel"}</button>
           <button type="button" onClick={() => window.print()} className="min-h-11 rounded-lg bg-emerald-700 px-7 py-3 font-semibold text-white">Print Result</button>
-          {!readOnly && <button type="submit" disabled={loading} className="min-h-11 rounded-lg bg-sky-700 px-7 py-3 font-semibold text-white disabled:opacity-60">{loading ? "Submitting..." : "Submit Result"}</button>}
+          {readOnly && onEdit && <button type="button" onClick={onEdit} className="min-h-11 rounded-lg bg-sky-700 px-7 py-3 font-semibold text-white">Edit Result</button>}
+          {!readOnly && <button type="submit" disabled={loading} className="min-h-11 rounded-lg bg-sky-700 px-7 py-3 font-semibold text-white disabled:opacity-60">{loading ? "Saving..." : submitLabel}</button>}
         </div>
       </form>
     </div>
