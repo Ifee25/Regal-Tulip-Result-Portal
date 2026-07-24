@@ -19,6 +19,29 @@ AS $$
     END;
 $$;
 
+-- Earlier portal versions sent assessment_data as a JSON-formatted string.
+-- Newer versions send a proper JSON object. This function safely supports both.
+CREATE OR REPLACE FUNCTION public.normalized_assessment_data(saved_data JSONB)
+RETURNS JSONB
+LANGUAGE plpgsql
+IMMUTABLE
+AS $$
+BEGIN
+  IF saved_data IS NULL THEN
+    RETURN '{}'::jsonb;
+  END IF;
+
+  IF jsonb_typeof(saved_data) = 'string' THEN
+    RETURN (saved_data #>> '{}')::jsonb;
+  END IF;
+
+  RETURN saved_data;
+EXCEPTION
+  WHEN OTHERS THEN
+    RETURN '{}'::jsonb;
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION public.recalculate_primary_positions()
 RETURNS VOID
 LANGUAGE plpgsql
@@ -29,27 +52,52 @@ BEGIN
   WITH ranked_results AS (
     SELECT
       id,
+      report,
+      term_average,
       rank() OVER (
         PARTITION BY
           lower(class_name),
           lower(term),
-          lower(coalesce(assessment_data->>'session', ''))
-        ORDER BY average_score DESC
+          lower(coalesce(report->>'session', ''))
+        ORDER BY term_average DESC
       ) AS arm_position,
       count(*) OVER (
         PARTITION BY
           lower(class_name),
           lower(term),
-          lower(coalesce(assessment_data->>'session', ''))
+          lower(coalesce(report->>'session', ''))
       ) AS pupils_in_arm
-    FROM public.students
-    WHERE assessment_data->>'section' = 'Primary'
+    FROM (
+      SELECT
+        normalized_results.*,
+        coalesce(term_scores.term_average, normalized_results.average_score) AS term_average
+      FROM (
+        SELECT
+          pupil.*,
+          public.normalized_assessment_data(pupil.assessment_data) AS report
+        FROM public.students AS pupil
+      ) AS normalized_results
+      LEFT JOIN LATERAL (
+        SELECT avg((subject->>'total')::numeric) AS term_average
+        FROM jsonb_array_elements(
+          CASE
+            WHEN jsonb_typeof(normalized_results.report->'primary_subjects') = 'array'
+              THEN normalized_results.report->'primary_subjects'
+            ELSE '[]'::jsonb
+          END
+        ) AS subject
+        WHERE coalesce((subject->>'not_offered')::boolean, FALSE) = FALSE
+          AND (subject ? 'cat' OR subject ? 'exam')
+          AND subject->>'total' ~ '^-?[0-9]+([.][0-9]+)?$'
+      ) AS term_scores ON TRUE
+    ) AS results_with_term_average
+    WHERE report->>'section' = 'Primary'
   )
   UPDATE public.students AS pupil
   SET
     assessment_data = jsonb_set(
       jsonb_set(
-        coalesce(pupil.assessment_data, '{}'::jsonb) - 'overall_position',
+        ranked.report - 'overall_position',
         '{number_in_class}',
         to_jsonb(ranked.pupils_in_arm::TEXT),
         TRUE
@@ -58,13 +106,16 @@ BEGIN
         to_jsonb(public.format_school_position(ranked.arm_position)),
         TRUE
     ),
+    average_score = ranked.term_average,
     updated_at = now()
   FROM ranked_results AS ranked
   WHERE pupil.id = ranked.id
     AND (
-      pupil.assessment_data->>'number_in_class' IS DISTINCT FROM ranked.pupils_in_arm::TEXT
-      OR pupil.assessment_data->>'position' IS DISTINCT FROM public.format_school_position(ranked.arm_position)
-      OR pupil.assessment_data ? 'overall_position'
+      ranked.report->>'number_in_class' IS DISTINCT FROM ranked.pupils_in_arm::TEXT
+      OR ranked.report->>'position' IS DISTINCT FROM public.format_school_position(ranked.arm_position)
+      OR ranked.report ? 'overall_position'
+      OR jsonb_typeof(pupil.assessment_data) = 'string'
+      OR pupil.average_score IS DISTINCT FROM ranked.term_average
     );
 END;
 $$;

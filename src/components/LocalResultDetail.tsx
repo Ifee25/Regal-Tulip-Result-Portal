@@ -122,7 +122,7 @@ export default function LocalResultDetail({ id, startInEditMode = false }: { id:
         average_score: updatedAssessment.section === "Primary" && totals.length
           ? Number((totals.reduce((sum, score) => sum + score, 0) / totals.length).toFixed(2))
           : 0,
-        assessment_data: JSON.stringify(updatedAssessment),
+        assessment_data: updatedAssessment,
       };
 
       if (id.startsWith("local-")) {

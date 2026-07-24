@@ -61,6 +61,24 @@ export default function DashboardPage() {
       return String(row.class_name ?? "").startsWith("Nursery");
     }
   };
+  const getTermAverage = (row: { assessment_data?: unknown; average_score?: unknown }) => {
+    try {
+      const assessment = (typeof row.assessment_data === "string"
+        ? JSON.parse(row.assessment_data)
+        : row.assessment_data) as AssessmentResult | undefined;
+      const totals = (assessment?.primary_subjects ?? [])
+        .filter((subject) =>
+          !subject.not_offered
+          && subject.total !== undefined
+          && (subject.cat !== undefined || subject.exam !== undefined))
+        .map((subject) => Number(subject.total))
+        .filter(Number.isFinite);
+      if (totals.length) return totals.reduce((sum, total) => sum + total, 0) / totals.length;
+    } catch {
+      // Fall back to the stored term average for legacy or damaged rows.
+    }
+    return Number(row.average_score || 0);
+  };
 
   function readLocalResults(): any[] {
     if (typeof window === "undefined") return [];
@@ -385,7 +403,7 @@ export default function DashboardPage() {
       class_name: result.class_name,
       term: result.term,
       average_score: averageScore,
-      assessment_data: JSON.stringify(result),
+      assessment_data: result,
       uploaded_by: user.id,
       uploaded_by_email: user.email?.toLowerCase() ?? null,
     };
@@ -485,7 +503,7 @@ export default function DashboardPage() {
 
   const primaryResults = results.filter((row) => !isNurseryResult(row));
   const averageScore = primaryResults.length
-    ? Math.round(primaryResults.reduce((sum, row) => sum + Number(row.average_score || 0), 0) / primaryResults.length)
+    ? Math.round(primaryResults.reduce((sum, row) => sum + getTermAverage(row), 0) / primaryResults.length)
     : 0;
 
   const STAFF_ACCESS_CODE = "school2026";
@@ -816,7 +834,7 @@ export default function DashboardPage() {
                           {isNurseryResult(r) ? (
                             "—"
                           ) : (
-                            `${r.average_score}%`
+                            `${getTermAverage(r).toFixed(1)}%`
                           )}
                         </td>
                         <td className="px-4 py-3 text-right">
