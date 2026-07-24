@@ -18,11 +18,10 @@ const makeSubjects = (prior: Props["priorTermResults"]): PrimarySubjectResult[] 
   not_offered: prior.first?.primary_subjects?.[index]?.not_offered || prior.second?.primary_subjects?.[index]?.not_offered,
 }));
 const makeRatings = (labels: readonly string[]): PrimaryRating[] => labels.map((label) => ({ label }));
-const asNumber = (value: string) => value === "" ? undefined : Number(value);
-
 export default function PrimaryThirdTermTemplate({ student_name, session, term, class_name, priorTermResults, onSubmit, onCancel, initialResult, readOnly = false, draftKey, onEdit, submitLabel = "Submit Result" }: Props) {
   const previousDetails = priorTermResults.second ?? priorTermResults.first;
   const [subjects, setSubjects] = useState(() => initialResult?.primary_subjects?.length ? initialResult.primary_subjects : makeSubjects(priorTermResults));
+  const [scoreDrafts, setScoreDrafts] = useState<Record<string, string>>({});
   const [affective, setAffective] = useState(() => initialResult?.affective_traits?.length ? initialResult.affective_traits : makeRatings(PRIMARY_AFFECTIVE_TRAITS));
   const [psychomotor, setPsychomotor] = useState(() => initialResult?.psychomotor_skills?.length ? initialResult.psychomotor_skills : makeRatings(PRIMARY_PSYCHOMOTOR_SKILLS));
   const [info, setInfo] = useState<Info>({
@@ -92,17 +91,43 @@ export default function PrimaryThirdTermTemplate({ student_name, session, term, 
   const annualTotalAverage = annualSubjectsEntered ? grandAnnualTotal / (annualSubjectsEntered * 3) : 0;
 
   const setInfoValue = (key: keyof Info, value: string) => setInfo((old) => ({ ...old, [key]: value }));
-  const updateSubject = (index: number, key: keyof PrimarySubjectResult, value: string) => setSubjects((old) => old.map((row, i) => {
-    if (i !== index) return row;
-    if (value.trim().toUpperCase().startsWith("N")) return { ...row, not_offered: true, cat: undefined, exam: undefined };
-    return { ...row, not_offered: false, [key]: key === "remark" ? value : asNumber(value) };
-  }));
+  const updateSubject = (index: number, key: keyof PrimarySubjectResult, value: string) => {
+    const draftId = `${index}:${String(key)}`;
+    if (subjects[index].not_offered) {
+      if (value === "N/A") return;
+      setScoreDrafts((old) => ({ ...old, [draftId]: "" }));
+      setSubjects((old) => old.map((row, i) => i === index ? { ...row, not_offered: false, [key]: undefined } : row));
+      return;
+    }
+    if (value.trim().toUpperCase().startsWith("N")) {
+      setScoreDrafts((old) => {
+        const next = { ...old };
+        Object.keys(next).filter((id) => id.startsWith(`${index}:`)).forEach((id) => delete next[id]);
+        return next;
+      });
+      setSubjects((old) => old.map((row, i) => i === index ? { ...row, not_offered: true, cat: undefined, exam: undefined } : row));
+      return;
+    }
+    if (!/^\d*\.?\d*$/.test(value)) return;
+    setScoreDrafts((old) => ({ ...old, [draftId]: value }));
+    setSubjects((old) => old.map((row, i) => i === index
+      ? { ...row, not_offered: false, [key]: value === "" || value === "." ? undefined : Number(value) }
+      : row));
+  };
+  const finishScoreEdit = (index: number, key: keyof PrimarySubjectResult) => {
+    const draftId = `${index}:${String(key)}`;
+    setScoreDrafts((old) => {
+      const next = { ...old };
+      delete next[draftId];
+      return next;
+    });
+  };
   const updateRating = (kind: "affective" | "psychomotor", index: number, value: string) => {
     const setter = kind === "affective" ? setAffective : setPsychomotor;
     setter((old) => old.map((row, i) => i === index ? { ...row, rating: value === "" ? undefined : value as PrimaryRating["rating"] } : row));
   };
-  const line = (key: keyof Info, label: string, className = "") => <label className={`flex min-w-0 items-end gap-1 whitespace-nowrap ${className}`}><b>{label}</b><input value={info[key]} onChange={(e) => setInfoValue(key, e.target.value)} className="min-w-0 flex-1 border-0 border-b border-black bg-transparent px-1 outline-none" /></label>;
-  const score = (index: number, key: keyof PrimarySubjectResult, max = 100) => <input type="text" inputMode="numeric" value={subjects[index].not_offered ? "N/A" : subjects[index][key] as number | undefined ?? ""} onChange={(e) => updateSubject(index, key, e.target.value)} className="h-full w-full bg-transparent px-0.5 text-center outline-none" aria-label={`${subjects[index].subject} ${String(key)}`} data-max={max} />;
+  const line = (key: keyof Info, label: string, className = "", locked = false) => <label className={`flex min-w-0 items-end gap-1 whitespace-nowrap ${className}`}><b>{label}</b><input value={info[key]} readOnly={locked} onChange={(e) => setInfoValue(key, e.target.value)} className="min-w-0 flex-1 border-0 border-b border-black bg-transparent px-1 outline-none" /></label>;
+  const score = (index: number, key: keyof PrimarySubjectResult, max = 100) => <input type="text" inputMode="decimal" value={subjects[index].not_offered ? "N/A" : scoreDrafts[`${index}:${String(key)}`] ?? subjects[index][key] as number | undefined ?? ""} onChange={(e) => updateSubject(index, key, e.target.value)} onBlur={() => finishScoreEdit(index, key)} className="h-full w-full bg-transparent px-0.5 text-center outline-none" aria-label={`${subjects[index].subject} ${String(key)}`} data-max={max} />;
 
   async function submit(event: React.FormEvent) {
     event.preventDefault(); setLoading(true); setMessage(null);
@@ -117,7 +142,7 @@ export default function PrimaryThirdTermTemplate({ student_name, session, term, 
       <div className={`primary-sheet primary-annual-sheet overflow-x-auto bg-white p-6 shadow-xl sm:p-9 ${readOnly ? "read-only-sheet" : ""}`}><div className="min-w-[1320px] text-[14px] font-medium leading-tight">
         <header className="grid grid-cols-[150px_1fr_150px] items-center"><Image src="/school-logo-transparent.png" alt="Regal Tulip School logo" width={118} height={118} className="mx-auto object-contain" priority /><div className="text-center"><h1 className="text-[39px] font-black">REGAL TULIP SCHOOL, NKWELLE EZUNAKA.</h1><h2 className="mt-4 text-[31px] font-black">PUPIL&apos;S PROGRESS REPORT</h2></div><div /></header>
         <div className="mt-7 grid grid-cols-[2.3fr_1.15fr_1fr_1.2fr_1fr_1.35fr] gap-3"><label className="flex"><b>NAME:</b><span className="flex-1 border-b border-black px-1">{student_name}</span></label><label className="flex"><b>CLASS:</b><span className="flex-1 border-b border-black px-1">{class_name}</span></label>{line("age", "AGE:")}{line("averageAge", "AVERAGE AGE:")}<label className="flex"><b>TERM:</b><span className="flex-1 border-b border-black px-1">{term}</span></label>{line("session", "SESSION:")}</div>
-        <div className="my-6 grid grid-cols-[1.1fr_.8fr_1.2fr_1.2fr_2fr] gap-3">{line("numberInClass", "NO IN CLASS:", "primary-long-line")}{line("position", "POSITION:", "primary-long-line")}<div className="flex gap-2"><b>WEIGHT:</b>{line("weightStart", "W1 (kg)", "primary-short-line")}{line("weightEnd", "W2 (kg)", "primary-short-line")}</div><div className="flex gap-2"><b>HEIGHT:</b>{line("heightStart", "H1 (cm):", "primary-short-line")}{line("heightEnd", "H2 (cm):", "primary-short-line")}</div>{line("teacher", "TEACHER:")}</div>
+        <div className="my-6 grid grid-cols-[.85fr_.8fr_1.2fr_1.2fr_1.55fr] gap-3">{line("numberInClass", "NO IN CLASS:", "", true)}{line("position", "POSITION:", "", true)}<div className="flex gap-2"><b>WEIGHT:</b>{line("weightStart", "W1 (kg)", "primary-short-line")}{line("weightEnd", "W2 (kg)", "primary-short-line")}</div><div className="flex gap-2"><b>HEIGHT:</b>{line("heightStart", "H1 (cm):", "primary-short-line")}{line("heightEnd", "H2 (cm):", "primary-short-line")}</div>{line("teacher", "TEACHER:")}</div>
         <table className="w-full table-fixed border-collapse border border-black text-[12px]"><colgroup><col className="w-[20.5%]" /><col className="w-[3.8%]" /><col className="w-[4.7%]" /><col className="w-[4.7%]" /><col className="w-[5.4%]" /><col className="w-[5.2%]" /><col className="w-[5.6%]" /><col className="w-[5.9%]" /><col className="w-[6.2%]" /><col className="w-[5.3%]" /><col className="w-[5.3%]" /><col className="w-[10.5%]" /><col className="w-[14.4%]" /><col className="w-[2.5%]" /></colgroup>
           <thead><tr className="h-10"><th rowSpan={2} className="border border-black px-4 text-left text-lg">SUBJECT</th><th rowSpan={2} className="border border-black">CA<br />40</th><th rowSpan={2} className="border border-black">EXAM<br />60</th><th rowSpan={2} className="border border-black">TOTAL<br />100</th><th rowSpan={2} className="border border-black">CLASS<br />HIGHEST<br />SCORE</th><th rowSpan={2} className="border border-black">CLASS<br />LOWEST<br />SCORE</th><th colSpan={5} className="border border-black">YEAR&apos;S SUMMARY</th><th rowSpan={2} className="border border-black">REMARK</th><th rowSpan={2} className="border border-black text-base">AFFECTIVE TRAITS</th><th rowSpan={2} className="border border-black" /></tr><tr className="h-11"><th className="border border-black">1ST TERM<br />SCORE</th><th className="border border-black">2ND TERM<br />SCORE</th><th className="border border-black">3RD TERM<br />SCORE</th><th className="border border-black">ANNUAL<br />TOTAL</th><th className="border border-black">ANNUAL<br />AVERAGE</th></tr></thead>
           <tbody>{subjects.map((row, index) => { const pIndex = index - 13; const trait = affective[index]; const skill = psychomotor[pIndex]; return <tr key={row.subject} className="h-6"><td className="border border-black px-4 font-bold">{row.subject}</td><td className="border border-black">{score(index, "cat", 40)}</td><td className="border border-black">{score(index, "exam", 60)}</td><td className="border border-black text-center">{row.not_offered ? "N/A" : calculated[index].total || ""}</td><td className="border border-black">{score(index, "class_highest_score")}</td><td className="border border-black">{score(index, "class_lowest_score")}</td><td className="border border-black">{score(index, "first_term_score")}</td><td className="border border-black">{score(index, "second_term_score")}</td><td className="border border-black text-center">{row.not_offered ? "N/A" : calculated[index].total || ""}</td><td className="border border-black text-center">{row.not_offered ? "N/A" : calculated[index].annualTotal || ""}</td><td className="border border-black text-center">{row.not_offered ? "N/A" : calculated[index].annualAverage ? calculated[index].annualAverage.toFixed(1) : ""}</td><td className="border border-black px-1 text-center text-[10px] font-semibold">{row.not_offered ? "N/A" : getPrimaryRemark(calculated[index].total, row.cat !== undefined || row.exam !== undefined)}</td><td className={`border border-black px-2 ${index === 12 ? "font-black" : ""}`}>{index === 11 ? "" : index === 12 ? "PSYCHOMOTOR SKILLS" : trait?.label ?? skill?.label ?? ""}</td><td className="border border-black">{trait || skill ? <select aria-label={`${(trait ?? skill).label} rating`} value={(trait ?? skill).rating ?? ""} onChange={(e) => updateRating(trait ? "affective" : "psychomotor", trait ? index : pIndex, e.target.value)} className="rating-select h-full w-full bg-transparent text-center outline-none"><option value="" /><option>A</option><option>B</option><option>C</option><option>D</option></select> : null}</td></tr>})}

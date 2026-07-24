@@ -376,7 +376,7 @@ export default function DashboardPage() {
           const totals = (result.primary_subjects ?? [])
             .filter((subject) => !subject.not_offered && subject.total !== undefined)
             .map((subject) => subject.total as number);
-          return totals.length ? Math.round(totals.reduce((a, b) => a + b, 0) / totals.length) : 0;
+          return totals.length ? Number((totals.reduce((a, b) => a + b, 0) / totals.length).toFixed(2)) : 0;
         })()
       : 0;
 

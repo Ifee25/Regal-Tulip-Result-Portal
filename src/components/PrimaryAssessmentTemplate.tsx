@@ -31,10 +31,9 @@ const emptySubjects = (): PrimarySubjectResult[] =>
 const emptyRatings = (labels: readonly string[]): PrimaryRating[] =>
   labels.map((label) => ({ label }));
 
-const numberValue = (value: string) => value === "" ? undefined : Number(value);
-
 export default function PrimaryAssessmentTemplate({ student_name, session, term, class_name, onSubmit, onCancel, initialResult, readOnly = false, draftKey, onEdit, submitLabel = "Submit Result" }: Props) {
   const [subjects, setSubjects] = useState(() => initialResult?.primary_subjects?.length ? initialResult.primary_subjects : emptySubjects());
+  const [scoreDrafts, setScoreDrafts] = useState<Record<string, string>>({});
   const [affectiveTraits, setAffectiveTraits] = useState(() => initialResult?.affective_traits?.length ? initialResult.affective_traits : emptyRatings(PRIMARY_AFFECTIVE_TRAITS));
   const [psychomotorSkills, setPsychomotorSkills] = useState(() => initialResult?.psychomotor_skills?.length ? initialResult.psychomotor_skills : emptyRatings(PRIMARY_PSYCHOMOTOR_SKILLS));
   const [info, setInfo] = useState({
@@ -89,13 +88,44 @@ export default function PrimaryAssessmentTemplate({ student_name, session, term,
 
   const setInfoValue = (key: keyof typeof info, value: string) => setInfo((old) => ({ ...old, [key]: value }));
   const updateSubject = (index: number, key: keyof PrimarySubjectResult, value: string) => {
+    const draftId = `${index}:${String(key)}`;
+    const currentRow = subjects[index];
+
+    if (currentRow.not_offered) {
+      if (value === "N/A") return;
+      setScoreDrafts((old) => ({ ...old, [draftId]: "" }));
+      setSubjects((old) => old.map((row, i) => i === index
+        ? { ...row, not_offered: false, [key]: undefined }
+        : row));
+      return;
+    }
+
+    if ((key === "cat" || key === "exam") && value.trim().toUpperCase().startsWith("N")) {
+      setScoreDrafts((old) => {
+        const next = { ...old };
+        Object.keys(next).filter((id) => id.startsWith(`${index}:`)).forEach((id) => delete next[id]);
+        return next;
+      });
+      setSubjects((old) => old.map((row, i) => i === index
+        ? { ...row, not_offered: true, cat: undefined, exam: undefined }
+        : row));
+      return;
+    }
+
+    if (!/^\d*\.?\d*$/.test(value)) return;
+    setScoreDrafts((old) => ({ ...old, [draftId]: value }));
     setSubjects((old) => old.map((row, i) => {
       if (i !== index) return row;
-      if ((key === "cat" || key === "exam") && value.trim().toUpperCase().startsWith("N")) {
-        return { ...row, not_offered: true, cat: undefined, exam: undefined };
-      }
-      return { ...row, not_offered: false, [key]: key === "remark" ? value : numberValue(value) };
+      return { ...row, not_offered: false, [key]: value === "" || value === "." ? undefined : Number(value) };
     }));
+  };
+  const finishScoreEdit = (index: number, key: keyof PrimarySubjectResult) => {
+    const draftId = `${index}:${String(key)}`;
+    setScoreDrafts((old) => {
+      const next = { ...old };
+      delete next[draftId];
+      return next;
+    });
   };
   const updateRating = (kind: "affective" | "psychomotor", index: number, value: string) => {
     const setter = kind === "affective" ? setAffectiveTraits : setPsychomotorSkills;
@@ -126,13 +156,13 @@ export default function PrimaryAssessmentTemplate({ student_name, session, term,
     }
   }
 
-  const lineInput = (key: keyof typeof info, label: string, className = "") => (
+  const lineInput = (key: keyof typeof info, label: string, className = "", locked = false) => (
     <label className={`flex min-w-0 items-end gap-1 whitespace-nowrap ${className}`}>
-      <b>{label}</b><input value={info[key]} onChange={(e) => setInfoValue(key, e.target.value)} className="min-w-0 flex-1 border-0 border-b border-dotted border-black bg-transparent px-1 outline-none" />
+      <b>{label}</b><input value={info[key]} readOnly={locked} onChange={(e) => setInfoValue(key, e.target.value)} className="min-w-0 flex-1 border-0 border-b border-dotted border-black bg-transparent px-1 outline-none" />
     </label>
   );
   const scoreInput = (row: number, key: keyof PrimarySubjectResult, max?: number) => (
-    <input type={key === "cat" || key === "exam" ? "text" : "number"} inputMode={key === "cat" || key === "exam" ? "numeric" : undefined} min={0} max={max} value={subjects[row].not_offered && (key === "cat" || key === "exam") ? "N/A" : subjects[row][key] as number | undefined ?? ""} onChange={(e) => updateSubject(row, key, e.target.value)} className="h-full w-full bg-transparent px-1 text-center outline-none" />
+    <input type="text" inputMode="decimal" min={0} max={max} value={subjects[row].not_offered && (key === "cat" || key === "exam") ? "N/A" : scoreDrafts[`${row}:${String(key)}`] ?? subjects[row][key] as number | undefined ?? ""} onChange={(e) => updateSubject(row, key, e.target.value)} onBlur={() => finishScoreEdit(row, key)} className="h-full w-full bg-transparent px-1 text-center outline-none" />
   );
 
   return (
@@ -155,8 +185,8 @@ export default function PrimaryAssessmentTemplate({ student_name, session, term,
               <label className="flex"><b>TERM:</b><span className="flex-1 border-b border-dotted border-black px-1">{term}</span></label>
               {lineInput("session", "SESSION:")}
             </div>
-            <div className="my-5 grid grid-cols-[1.1fr_1fr_1.25fr_1.25fr_1.8fr] gap-3">
-              {lineInput("numberInClass", "NO IN CLASS:", "primary-long-line")}{lineInput("position", "POSITION:", "primary-long-line")}
+            <div className="my-5 grid grid-cols-[.85fr_.8fr_1.2fr_1.2fr_1.55fr] gap-3">
+              {lineInput("numberInClass", "NO IN CLASS:", "", true)}{lineInput("position", "POSITION:", "", true)}
               <div className="flex gap-2"><b>WEIGHT:</b>{lineInput("weightStart", "W1 (kg)", "primary-short-line")}{lineInput("weightEnd", "W2 (kg)", "primary-short-line")}</div>
               <div className="flex gap-2"><b>HEIGHT:</b>{lineInput("heightStart", "H1 (cm)", "primary-short-line")}{lineInput("heightEnd", "H2 (cm)", "primary-short-line")}</div>
               {lineInput("teacher", "TEACHER:")}

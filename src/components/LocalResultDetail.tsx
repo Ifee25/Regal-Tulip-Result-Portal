@@ -117,10 +117,10 @@ export default function LocalResultDetail({ id, startInEditMode = false }: { id:
       const totals = (updatedAssessment.primary_subjects ?? [])
         .filter((subject) => !subject.not_offered && subject.total !== undefined)
         .map((subject) => subject.total as number);
-      const updated = {
+      let updated: LocalResult = {
         ...result,
         average_score: updatedAssessment.section === "Primary" && totals.length
-          ? Math.round(totals.reduce((sum, score) => sum + score, 0) / totals.length)
+          ? Number((totals.reduce((sum, score) => sum + score, 0) / totals.length).toFixed(2))
           : 0,
         assessment_data: JSON.stringify(updatedAssessment),
       };
@@ -135,6 +135,12 @@ export default function LocalResultDetail({ id, startInEditMode = false }: { id:
           assessment_data: updated.assessment_data,
         }).eq("id", id);
         if (error) throw new Error(error.message);
+        const { data: refreshed } = await supabase
+          .from("students")
+          .select("id, student_name, class_name, term, average_score, assessment_data, created_at, uploaded_by, uploaded_by_email")
+          .eq("id", id)
+          .single();
+        if (refreshed) updated = refreshed as LocalResult;
         window.localStorage.setItem(`regal-tulip-review:${id}`, JSON.stringify(updated));
       }
       setResult(updated);
