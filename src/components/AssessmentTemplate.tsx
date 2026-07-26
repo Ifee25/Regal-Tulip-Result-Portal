@@ -85,12 +85,41 @@ export default function AssessmentTemplate({ student_name, session, term, class_
     setInfo((current) => ({ ...current, [field]: value }));
 
   function updateScore(categoryIndex: number, itemIndex: number, value: string) {
+    const currentItem = assessments[categoryIndex].items[itemIndex];
+    if (currentItem.not_applicable) {
+      if (value === "N/A") return;
+      setAssessments((current) => current.map((category, currentCategory) =>
+        currentCategory !== categoryIndex ? category : {
+          ...category,
+          items: category.items.map((item, currentItemIndex) =>
+            currentItemIndex === itemIndex
+              ? { ...item, score: undefined, not_applicable: false }
+              : item),
+        },
+      ));
+      return;
+    }
+
+    if (value.trim().toUpperCase().startsWith("N")) {
+      setAssessments((current) => current.map((category, currentCategory) =>
+        currentCategory !== categoryIndex ? category : {
+          ...category,
+          items: category.items.map((item, currentItemIndex) =>
+            currentItemIndex === itemIndex
+              ? { ...item, score: undefined, not_applicable: true }
+              : item),
+        },
+      ));
+      return;
+    }
+
+    if (!/^\d*$/.test(value)) return;
     const score = value === "" ? undefined : Math.min(5, Math.max(1, Number(value)));
     setAssessments((current) => current.map((category, currentCategory) =>
       currentCategory !== categoryIndex ? category : {
         ...category,
         items: category.items.map((item, currentItem) =>
-          currentItem === itemIndex ? { ...item, score } : item),
+          currentItem === itemIndex ? { ...item, score, not_applicable: false } : item),
       },
     ));
   }
@@ -106,11 +135,11 @@ export default function AssessmentTemplate({ student_name, session, term, class_
               <span>{item.label}</span>
               <input
                 aria-label={`${item.label} score`}
-                type="number"
-                inputMode="numeric"
-                min={1}
-                max={5}
-                value={assessments[categoryIndex].items[itemIndex].score ?? ""}
+                type="text"
+                inputMode="text"
+                value={assessments[categoryIndex].items[itemIndex].not_applicable
+                  ? "N/A"
+                  : assessments[categoryIndex].items[itemIndex].score ?? ""}
                 onChange={(event) => updateScore(categoryIndex, itemIndex, event.target.value)}
                 className="score-box"
               />

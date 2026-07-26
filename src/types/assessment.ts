@@ -7,6 +7,7 @@ export type AssessmentItem = {
   id: string;
   label: string;
   score?: number;
+  not_applicable?: boolean;
 };
 
 export type AssessmentResult = {
