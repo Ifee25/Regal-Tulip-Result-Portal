@@ -72,23 +72,28 @@ export default function PrimaryThirdTermTemplate({ student_name, session, term, 
   }
 
   const calculated = useMemo(() => subjects.map((row) => {
-    if (row.not_offered) return { total: 0, annualTotal: 0, annualAverage: 0 };
+    if (row.not_offered) return { total: 0, annualTotal: 0, annualAverage: 0, termsEntered: 0 };
     const total = (row.cat ?? 0) + (row.exam ?? 0);
-    const annualTotal = (row.first_term_score ?? 0) + (row.second_term_score ?? 0) + total;
-    const termsEntered = [row.first_term_score, row.second_term_score, row.cat, row.exam].some((value) => value !== undefined);
-    return { total, annualTotal, annualAverage: termsEntered ? annualTotal / 3 : 0 };
+    const hasThirdTermScore = row.cat !== undefined || row.exam !== undefined;
+    const termScores = [
+      row.first_term_score,
+      row.second_term_score,
+      hasThirdTermScore ? total : undefined,
+    ].filter((value): value is number => value !== undefined);
+    const annualTotal = termScores.reduce((sum, value) => sum + value, 0);
+    return {
+      total,
+      annualTotal,
+      annualAverage: termScores.length ? annualTotal / termScores.length : 0,
+      termsEntered: termScores.length,
+    };
   }), [subjects]);
   const entered = subjects.filter((row) => !row.not_offered && (row.cat !== undefined || row.exam !== undefined)).length;
   const grandTotal = calculated.reduce((sum, row, index) => subjects[index].not_offered ? sum : sum + row.total, 0);
   const average = entered ? grandTotal / entered : 0;
-  const annualSubjectsEntered = subjects.filter((row) => !row.not_offered && (
-    row.first_term_score !== undefined ||
-    row.second_term_score !== undefined ||
-    row.cat !== undefined ||
-    row.exam !== undefined
-  )).length;
   const grandAnnualTotal = calculated.reduce((sum, row, index) => subjects[index].not_offered ? sum : sum + row.annualTotal, 0);
-  const annualTotalAverage = annualSubjectsEntered ? grandAnnualTotal / (annualSubjectsEntered * 3) : 0;
+  const annualTermEntries = calculated.reduce((sum, row, index) => subjects[index].not_offered ? sum : sum + row.termsEntered, 0);
+  const annualTotalAverage = annualTermEntries ? grandAnnualTotal / annualTermEntries : 0;
 
   const setInfoValue = (key: keyof Info, value: string) => setInfo((old) => ({ ...old, [key]: value }));
   const updateSubject = (index: number, key: keyof PrimarySubjectResult, value: string) => {
