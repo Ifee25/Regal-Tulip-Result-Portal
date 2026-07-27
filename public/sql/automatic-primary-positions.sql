@@ -120,6 +120,113 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION public.recalculate_primary_subject_extremes()
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  WITH primary_results AS (
+    SELECT
+      id,
+      lower(trim(class_name)) AS class_key,
+      lower(trim(term)) AS term_key,
+      lower(trim(coalesce(report->>'session', ''))) AS session_key,
+      report
+    FROM (
+      SELECT
+        pupil.id,
+        pupil.class_name,
+        pupil.term,
+        public.normalized_assessment_data(pupil.assessment_data) AS report
+      FROM public.students AS pupil
+    ) AS normalized_results
+    WHERE report->>'section' = 'Primary'
+  ),
+  subject_scores AS (
+    SELECT
+      result.class_key,
+      result.term_key,
+      result.session_key,
+      lower(trim(subject.item->>'subject')) AS subject_key,
+      (subject.item->>'total')::numeric AS term_total
+    FROM primary_results AS result
+    CROSS JOIN LATERAL jsonb_array_elements(
+      CASE
+        WHEN jsonb_typeof(result.report->'primary_subjects') = 'array'
+          THEN result.report->'primary_subjects'
+        ELSE '[]'::jsonb
+      END
+    ) AS subject(item)
+    WHERE coalesce((subject.item->>'not_offered')::boolean, FALSE) = FALSE
+      AND (subject.item ? 'cat' OR subject.item ? 'exam')
+      AND subject.item->>'total' ~ '^-?[0-9]+([.][0-9]+)?$'
+  ),
+  subject_extremes AS (
+    SELECT
+      class_key,
+      term_key,
+      session_key,
+      subject_key,
+      max(term_total) AS highest_score,
+      min(term_total) AS lowest_score
+    FROM subject_scores
+    GROUP BY class_key, term_key, session_key, subject_key
+  ),
+  rebuilt_reports AS (
+    SELECT
+      result.id,
+      jsonb_set(
+        result.report,
+        '{primary_subjects}',
+        coalesce((
+          SELECT jsonb_agg(
+            CASE
+              WHEN extremes.subject_key IS NULL THEN
+                subject.item - 'class_highest_score' - 'class_lowest_score'
+              ELSE
+                jsonb_set(
+                  jsonb_set(
+                    subject.item,
+                    '{class_highest_score}',
+                    to_jsonb(extremes.highest_score),
+                    TRUE
+                  ),
+                  '{class_lowest_score}',
+                  to_jsonb(extremes.lowest_score),
+                  TRUE
+                )
+            END
+            ORDER BY subject.ordinality
+          )
+          FROM jsonb_array_elements(
+            CASE
+              WHEN jsonb_typeof(result.report->'primary_subjects') = 'array'
+                THEN result.report->'primary_subjects'
+              ELSE '[]'::jsonb
+            END
+          ) WITH ORDINALITY AS subject(item, ordinality)
+          LEFT JOIN subject_extremes AS extremes
+            ON extremes.class_key = result.class_key
+            AND extremes.term_key = result.term_key
+            AND extremes.session_key = result.session_key
+            AND extremes.subject_key = lower(trim(subject.item->>'subject'))
+        ), '[]'::jsonb),
+        TRUE
+      ) AS report
+    FROM primary_results AS result
+  )
+  UPDATE public.students AS pupil
+  SET
+    assessment_data = rebuilt.report,
+    updated_at = now()
+  FROM rebuilt_reports AS rebuilt
+  WHERE pupil.id = rebuilt.id
+    AND public.normalized_assessment_data(pupil.assessment_data) IS DISTINCT FROM rebuilt.report;
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION public.refresh_primary_positions_after_result_change()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -133,6 +240,7 @@ BEGIN
   END IF;
 
   PERFORM public.recalculate_primary_positions();
+  PERFORM public.recalculate_primary_subject_extremes();
   RETURN NULL;
 END;
 $$;
@@ -147,6 +255,7 @@ EXECUTE FUNCTION public.refresh_primary_positions_after_result_change();
 -- Populate positions for every primary result that was uploaded before this
 -- automation was installed.
 SELECT public.recalculate_primary_positions();
+SELECT public.recalculate_primary_subject_extremes();
 
 -- Return a clear verification summary in the SQL Editor.
 SELECT
@@ -161,3 +270,26 @@ FROM (
   FROM public.students
 ) AS saved_results
 WHERE report->>'section' = 'Primary';
+
+-- Verify that every subject with at least one entered score has class extrema.
+SELECT
+  count(*) AS entered_subject_rows,
+  count(*) FILTER (
+    WHERE subject->>'class_highest_score' IS NOT NULL
+      AND subject->>'class_lowest_score' IS NOT NULL
+  ) AS rows_with_highest_and_lowest,
+  count(*) FILTER (
+    WHERE subject->>'class_highest_score' IS NULL
+      OR subject->>'class_lowest_score' IS NULL
+  ) AS incomplete_extreme_rows
+FROM (
+  SELECT jsonb_array_elements(report->'primary_subjects') AS subject
+  FROM (
+    SELECT public.normalized_assessment_data(assessment_data) AS report
+    FROM public.students
+  ) AS saved_results
+  WHERE report->>'section' = 'Primary'
+    AND jsonb_typeof(report->'primary_subjects') = 'array'
+) AS subject_rows
+WHERE coalesce((subject->>'not_offered')::boolean, FALSE) = FALSE
+  AND (subject ? 'cat' OR subject ? 'exam');
