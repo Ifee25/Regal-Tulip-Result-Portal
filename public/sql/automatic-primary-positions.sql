@@ -91,7 +91,8 @@ BEGIN
           AND subject->>'total' ~ '^-?[0-9]+([.][0-9]+)?$'
       ) AS term_scores ON TRUE
     ) AS results_with_term_average
-    WHERE report->>'section' = 'Primary'
+    WHERE lower(trim(coalesce(report->>'section', ''))) = 'primary'
+      OR lower(trim(class_name)) LIKE 'primary %'
   )
   UPDATE public.students AS pupil
   SET
@@ -142,7 +143,8 @@ BEGIN
         public.normalized_assessment_data(pupil.assessment_data) AS report
       FROM public.students AS pupil
     ) AS normalized_results
-    WHERE report->>'section' = 'Primary'
+    WHERE lower(trim(coalesce(report->>'section', ''))) = 'primary'
+      OR lower(trim(class_name)) LIKE 'primary %'
   ),
   subject_scores AS (
     SELECT
@@ -266,10 +268,13 @@ SELECT
     WHERE report->>'position' IS NULL OR report->>'number_in_class' IS NULL
   ) AS incomplete_rank_records
 FROM (
-  SELECT public.normalized_assessment_data(assessment_data) AS report
+  SELECT
+    class_name,
+    public.normalized_assessment_data(assessment_data) AS report
   FROM public.students
 ) AS saved_results
-WHERE report->>'section' = 'Primary';
+WHERE lower(trim(coalesce(report->>'section', ''))) = 'primary'
+  OR lower(trim(class_name)) LIKE 'primary %';
 
 -- Verify that every subject with at least one entered score has class extrema.
 SELECT
@@ -285,10 +290,15 @@ SELECT
 FROM (
   SELECT jsonb_array_elements(report->'primary_subjects') AS subject
   FROM (
-    SELECT public.normalized_assessment_data(assessment_data) AS report
+    SELECT
+      class_name,
+      public.normalized_assessment_data(assessment_data) AS report
     FROM public.students
   ) AS saved_results
-  WHERE report->>'section' = 'Primary'
+  WHERE (
+      lower(trim(coalesce(report->>'section', ''))) = 'primary'
+      OR lower(trim(class_name)) LIKE 'primary %'
+    )
     AND jsonb_typeof(report->'primary_subjects') = 'array'
 ) AS subject_rows
 WHERE coalesce((subject->>'not_offered')::boolean, FALSE) = FALSE
@@ -308,7 +318,8 @@ WITH primary_results AS (
       public.normalized_assessment_data(assessment_data) AS report
     FROM public.students
   ) AS normalized_results
-  WHERE report->>'section' = 'Primary'
+  WHERE lower(trim(coalesce(report->>'section', ''))) = 'primary'
+    OR lower(trim(class_name)) LIKE 'primary %'
 ),
 all_subject_rows AS (
   SELECT
@@ -378,3 +389,55 @@ SELECT
       OR stored_lowest IS DISTINCT FROM expected_lowest
   ) AS mismatched_subject_cells
 FROM comparisons;
+
+-- Independently verify that every primary record is included in the correct
+-- arm, term, and session count and rank.
+WITH primary_records AS (
+  SELECT
+    id,
+    lower(trim(class_name)) AS class_key,
+    lower(trim(term)) AS term_key,
+    lower(trim(coalesce(report->>'session', ''))) AS session_key,
+    average_score,
+    report
+  FROM (
+    SELECT
+      pupil.*,
+      public.normalized_assessment_data(pupil.assessment_data) AS report
+    FROM public.students AS pupil
+  ) AS normalized_results
+  WHERE lower(trim(coalesce(report->>'section', ''))) = 'primary'
+    OR lower(trim(class_name)) LIKE 'primary %'
+),
+expected_rankings AS (
+  SELECT
+    id,
+    report,
+    rank() OVER (
+      PARTITION BY class_key, term_key, session_key
+      ORDER BY average_score DESC
+    ) AS expected_position,
+    count(*) OVER (
+      PARTITION BY class_key, term_key, session_key
+    ) AS expected_no_in_class
+  FROM primary_records
+),
+ranking_comparisons AS (
+  SELECT
+    report->>'position' AS stored_position,
+    report->>'number_in_class' AS stored_no_in_class,
+    public.format_school_position(expected_position) AS expected_position,
+    expected_no_in_class::text AS expected_no_in_class
+  FROM expected_rankings
+)
+SELECT
+  count(*) AS primary_records_checked,
+  count(*) FILTER (
+    WHERE stored_position = expected_position
+      AND stored_no_in_class = expected_no_in_class
+  ) AS correct_ranking_records,
+  count(*) FILTER (
+    WHERE stored_position IS DISTINCT FROM expected_position
+      OR stored_no_in_class IS DISTINCT FROM expected_no_in_class
+  ) AS mismatched_ranking_records
+FROM ranking_comparisons;
