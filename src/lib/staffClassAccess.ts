@@ -2,7 +2,7 @@ export const STAFF_CLASS_ASSIGNMENTS: Readonly<Record<string, readonly string[]>
   "mijane4real@gmail.com": ["Primary 3R"],
   "onuigbochidimmamaureen042@gmail.com": ["Nursery 3R"],
   "chinaemeremmirabel@gmail.com": ["Nursery 1S"],
-  "faithgodwinbest@gmail.com": ["Nursery 3T"],
+  "ucheg7359@gmail.com": ["Nursery 3T"],
   "onyii4god91@gmail.com": ["Nursery 2R"],
   "chinecheremekweozor@gmail.com": ["Nursery 1T"],
   "osigweoluchukwu33@gmail.com": ["Nursery 1R"],
