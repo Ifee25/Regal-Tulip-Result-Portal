@@ -293,3 +293,88 @@ FROM (
 ) AS subject_rows
 WHERE coalesce((subject->>'not_offered')::boolean, FALSE) = FALSE
   AND (subject ? 'cat' OR subject ? 'exam');
+
+-- Independently recompute and compare every stored class highest/lowest value.
+WITH primary_results AS (
+  SELECT
+    lower(trim(class_name)) AS class_key,
+    lower(trim(term)) AS term_key,
+    lower(trim(coalesce(report->>'session', ''))) AS session_key,
+    report
+  FROM (
+    SELECT
+      class_name,
+      term,
+      public.normalized_assessment_data(assessment_data) AS report
+    FROM public.students
+  ) AS normalized_results
+  WHERE report->>'section' = 'Primary'
+),
+all_subject_rows AS (
+  SELECT
+    result.class_key,
+    result.term_key,
+    result.session_key,
+    lower(trim(subject.item->>'subject')) AS subject_key,
+    CASE
+      WHEN subject.item->>'class_highest_score' ~ '^-?[0-9]+([.][0-9]+)?$'
+        THEN (subject.item->>'class_highest_score')::numeric
+      ELSE NULL
+    END AS stored_highest,
+    CASE
+      WHEN subject.item->>'class_lowest_score' ~ '^-?[0-9]+([.][0-9]+)?$'
+        THEN (subject.item->>'class_lowest_score')::numeric
+      ELSE NULL
+    END AS stored_lowest,
+    CASE
+      WHEN coalesce((subject.item->>'not_offered')::boolean, FALSE) = FALSE
+        AND (subject.item ? 'cat' OR subject.item ? 'exam')
+        AND subject.item->>'total' ~ '^-?[0-9]+([.][0-9]+)?$'
+        THEN (subject.item->>'total')::numeric
+      ELSE NULL
+    END AS entered_total
+  FROM primary_results AS result
+  CROSS JOIN LATERAL jsonb_array_elements(
+    CASE
+      WHEN jsonb_typeof(result.report->'primary_subjects') = 'array'
+        THEN result.report->'primary_subjects'
+      ELSE '[]'::jsonb
+    END
+  ) AS subject(item)
+),
+expected_extremes AS (
+  SELECT
+    class_key,
+    term_key,
+    session_key,
+    subject_key,
+    max(entered_total) AS expected_highest,
+    min(entered_total) AS expected_lowest
+  FROM all_subject_rows
+  WHERE entered_total IS NOT NULL
+  GROUP BY class_key, term_key, session_key, subject_key
+),
+comparisons AS (
+  SELECT
+    rows.stored_highest,
+    rows.stored_lowest,
+    expected.expected_highest,
+    expected.expected_lowest
+  FROM all_subject_rows AS rows
+  INNER JOIN expected_extremes AS expected
+    ON expected.class_key = rows.class_key
+    AND expected.term_key = rows.term_key
+    AND expected.session_key = rows.session_key
+    AND expected.subject_key = rows.subject_key
+)
+SELECT
+  count(*) AS subject_cells_checked,
+  count(*) FILTER (
+    WHERE stored_highest IS NOT DISTINCT FROM expected_highest
+      AND stored_lowest IS NOT DISTINCT FROM expected_lowest
+  ) AS correct_subject_cells,
+  count(*) FILTER (
+    WHERE stored_highest IS DISTINCT FROM expected_highest
+      OR stored_lowest IS DISTINCT FROM expected_lowest
+  ) AS mismatched_subject_cells
+FROM comparisons;
