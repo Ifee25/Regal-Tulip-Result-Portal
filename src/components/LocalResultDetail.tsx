@@ -103,6 +103,52 @@ export default function LocalResultDetail({ id, startInEditMode = false }: { id:
     };
   }, [id, startInEditMode]);
 
+  useEffect(() => {
+    if (id.startsWith("local-") || editing) return;
+    const supabase = getBrowserSupabase();
+    if (!supabase) return;
+    let cancelled = false;
+
+    const refreshOpenResult = async () => {
+      const { data, error } = await supabase
+        .from("students")
+        .select("id, student_name, class_name, term, average_score, assessment_data, created_at, uploaded_by, uploaded_by_email")
+        .eq("id", id)
+        .single();
+      if (cancelled || error || !data) return;
+      const remoteResult = data as LocalResult;
+      setResult(remoteResult);
+      try {
+        window.localStorage.setItem(`regal-tulip-review:${id}`, JSON.stringify(remoteResult));
+      } catch {
+        // Review caching is optional.
+      }
+    };
+
+    void refreshOpenResult();
+    const resultChanges = supabase
+      .channel(`open-result-sync:${id}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "students", filter: `id=eq.${id}` },
+        () => void refreshOpenResult(),
+      )
+      .subscribe();
+
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") void refreshOpenResult();
+    };
+    window.addEventListener("focus", refreshOpenResult);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", refreshOpenResult);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      void supabase.removeChannel(resultChanges);
+    };
+  }, [id, editing]);
+
   if (result === undefined) {
     return <main className="min-h-screen p-8 text-sm text-slate-600">Loading result...</main>;
   }

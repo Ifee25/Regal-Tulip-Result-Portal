@@ -234,6 +234,29 @@ export default function DashboardPage() {
   }, [user?.id, supabase]);
 
   useEffect(() => {
+    if (!user || !supabase) return;
+
+    const refreshResults = () => void fetchResults();
+    const resultChanges = supabase
+      .channel(`result-manager-sync:${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "students" },
+        refreshResults,
+      )
+      .subscribe();
+
+    window.addEventListener("focus", refreshResults);
+    document.addEventListener("visibilitychange", refreshResults);
+
+    return () => {
+      window.removeEventListener("focus", refreshResults);
+      document.removeEventListener("visibilitychange", refreshResults);
+      void supabase.removeChannel(resultChanges);
+    };
+  }, [user?.id, supabase]);
+
+  useEffect(() => {
     if (!isAdmin && assignedClass) {
       setSelectedSection(assignedClass.startsWith("Nursery") ? "Nursery" : "Primary");
       setSelectedClassName(assignedClass);

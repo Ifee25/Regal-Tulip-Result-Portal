@@ -56,16 +56,16 @@ BEGIN
       term_average,
       rank() OVER (
         PARTITION BY
-          lower(class_name),
-          lower(term),
-          lower(coalesce(report->>'session', ''))
+          lower(trim(class_name)),
+          lower(trim(term)),
+          lower(trim(coalesce(report->>'session', '')))
         ORDER BY term_average DESC
       ) AS arm_position,
       count(*) OVER (
         PARTITION BY
-          lower(class_name),
-          lower(term),
-          lower(coalesce(report->>'session', ''))
+          lower(trim(class_name)),
+          lower(trim(term)),
+          lower(trim(coalesce(report->>'session', '')))
       ) AS pupils_in_arm
     FROM (
       SELECT
@@ -139,7 +139,7 @@ $$;
 
 DROP TRIGGER IF EXISTS refresh_primary_positions_after_result_change ON public.students;
 CREATE TRIGGER refresh_primary_positions_after_result_change
-AFTER INSERT OR UPDATE OF average_score, class_name, term, assessment_data
+AFTER INSERT OR DELETE OR UPDATE OF average_score, class_name, term, assessment_data
 ON public.students
 FOR EACH STATEMENT
 EXECUTE FUNCTION public.refresh_primary_positions_after_result_change();
@@ -147,3 +147,17 @@ EXECUTE FUNCTION public.refresh_primary_positions_after_result_change();
 -- Populate positions for every primary result that was uploaded before this
 -- automation was installed.
 SELECT public.recalculate_primary_positions();
+
+-- Return a clear verification summary in the SQL Editor.
+SELECT
+  count(*) AS primary_results,
+  count(*) FILTER (WHERE report->>'position' IS NOT NULL) AS results_with_position,
+  count(*) FILTER (WHERE report->>'number_in_class' IS NOT NULL) AS results_with_no_in_class,
+  count(*) FILTER (
+    WHERE report->>'position' IS NULL OR report->>'number_in_class' IS NULL
+  ) AS incomplete_rank_records
+FROM (
+  SELECT public.normalized_assessment_data(assessment_data) AS report
+  FROM public.students
+) AS saved_results
+WHERE report->>'section' = 'Primary';
