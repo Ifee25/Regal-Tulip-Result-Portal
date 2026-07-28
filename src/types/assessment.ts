@@ -27,6 +27,7 @@ export type AssessmentResult = {
   next_term_begins?: string;
   class_teacher?: string;
   class_teacher_remarks?: string;
+  class_teacher_remarks_continued?: string;
   class_teacher_signature?: string;
   head_teacher_remarks?: string;
   head_teacher_signature?: string;

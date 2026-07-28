@@ -9,7 +9,7 @@ import {
 import { getPrimaryRemark } from "@/lib/primaryRemark";
 
 type Props = { student_name: string; session: string; term: string; class_name: string; priorTermResults: { first?: AssessmentResult; second?: AssessmentResult }; onSubmit: (result: AssessmentResult) => Promise<void>; onCancel: () => void; initialResult?: AssessmentResult; readOnly?: boolean; draftKey?: string; onEdit?: () => void; submitLabel?: string };
-type Info = { age: string; averageAge: string; session: string; numberInClass: string; position: string; weightStart: string; weightEnd: string; heightStart: string; heightEnd: string; teacher: string; daysOpened: string; daysAbsent: string; nextTermBegins: string; classTeacherRemark: string; headTeacherRemark: string };
+type Info = { age: string; averageAge: string; session: string; numberInClass: string; position: string; weightStart: string; weightEnd: string; heightStart: string; heightEnd: string; teacher: string; daysOpened: string; daysAbsent: string; nextTermBegins: string; classTeacherRemark: string; classTeacherRemarkContinued: string; classTeacherSignature: string; headTeacherRemark: string };
 
 const makeSubjects = (prior: Props["priorTermResults"]): PrimarySubjectResult[] => PRIMARY_THIRD_TERM_SUBJECTS.map((subject, index) => ({
   subject,
@@ -37,6 +37,8 @@ export default function PrimaryThirdTermTemplate({ student_name, session, term, 
     daysAbsent: initialResult?.days_absent?.toString() ?? "",
     nextTermBegins: initialResult?.next_term_begins ?? "",
     classTeacherRemark: initialResult?.class_teacher_remarks ?? "",
+    classTeacherRemarkContinued: initialResult?.class_teacher_remarks_continued ?? "",
+    classTeacherSignature: initialResult?.class_teacher_signature ?? "",
     headTeacherRemark: initialResult?.head_teacher_remarks ?? "",
   });
   const [loading, setLoading] = useState(false);
@@ -140,7 +142,7 @@ export default function PrimaryThirdTermTemplate({ student_name, session, term, 
   async function submit(event: React.FormEvent) {
     event.preventDefault(); setLoading(true); setMessage(null);
     try {
-      await onSubmit({ student_name, term, class_name, section: "Primary", assessments: [], session: info.session, age: info.age, average_age: info.averageAge, number_in_class: info.numberInClass, position: info.position, weight_start: info.weightStart, weight_end: info.weightEnd, height_start: info.heightStart, height_end: info.heightEnd, class_teacher: info.teacher, days_school_opened: Number(info.daysOpened), days_absent: Number(info.daysAbsent), next_term_begins: info.nextTermBegins, class_teacher_remarks: info.classTeacherRemark, head_teacher_remarks: info.headTeacherRemark, primary_subjects: subjects.map((row, i) => ({ ...row, total: row.not_offered ? undefined : calculated[i].total, third_term_score: row.not_offered ? undefined : calculated[i].total, annual_total: row.not_offered ? undefined : calculated[i].annualTotal, annual_average: row.not_offered ? undefined : calculated[i].annualAverage, remark: row.not_offered ? "" : getPrimaryRemark(calculated[i].total, row.cat !== undefined || row.exam !== undefined) })), affective_traits: affective, psychomotor_skills: psychomotor });
+      await onSubmit({ student_name, term, class_name, section: "Primary", assessments: [], session: info.session, age: info.age, average_age: info.averageAge, number_in_class: info.numberInClass, position: info.position, weight_start: info.weightStart, weight_end: info.weightEnd, height_start: info.heightStart, height_end: info.heightEnd, class_teacher: info.teacher, days_school_opened: Number(info.daysOpened), days_absent: Number(info.daysAbsent), next_term_begins: info.nextTermBegins, class_teacher_remarks: info.classTeacherRemark, class_teacher_remarks_continued: info.classTeacherRemarkContinued, class_teacher_signature: info.classTeacherSignature, head_teacher_remarks: info.headTeacherRemark, primary_subjects: subjects.map((row, i) => ({ ...row, total: row.not_offered ? undefined : calculated[i].total, third_term_score: row.not_offered ? undefined : calculated[i].total, annual_total: row.not_offered ? undefined : calculated[i].annualTotal, annual_average: row.not_offered ? undefined : calculated[i].annualAverage, remark: row.not_offered ? "" : getPrimaryRemark(calculated[i].total, row.cat !== undefined || row.exam !== undefined) })), affective_traits: affective, psychomotor_skills: psychomotor });
       if (draftKey) window.localStorage.removeItem(draftKey);
     } catch (error) { setMessage(error instanceof Error ? error.message : "Failed to submit result."); setLoading(false); }
   }
@@ -161,7 +163,11 @@ export default function PrimaryThirdTermTemplate({ student_name, session, term, 
           {line("classTeacherRemark", "Class Teacher's Remark:")}
           <div className="grid grid-cols-[1fr_auto] gap-4 font-bold"><span>RATING KEY</span><span className="whitespace-nowrap">H1: BEGINNING OF TERM</span></div>
           {line("daysAbsent", "Number of times absent:")}
-          <div className="grid grid-cols-[1fr_auto_100px] items-end gap-2"><span className="border-b border-black" /><span>Signature:</span><span className="border-b border-black" /></div>
+          <div className="grid grid-cols-[1fr_auto_100px] items-end gap-2">
+            <input aria-label="Continue class teacher remarks" value={info.classTeacherRemarkContinued} onChange={(e) => setInfoValue("classTeacherRemarkContinued", e.target.value)} className="min-w-0 border-0 border-b border-black bg-transparent px-1 outline-none" />
+            <span>Signature:</span>
+            <input aria-label="Class teacher signature" value={info.classTeacherSignature} onChange={(e) => setInfoValue("classTeacherSignature", e.target.value)} className="min-w-0 border-0 border-b border-black bg-transparent px-1 outline-none" />
+          </div>
           <div className="grid grid-cols-[1fr_auto] gap-4 font-bold"><span>A: EXCELLENT</span><span className="whitespace-nowrap">H2: END OF TERM</span></div>
           {line("nextTermBegins", "Next Term Begins:")}
           <div className="grid grid-cols-[auto_minmax(70px,1fr)_auto_100px] items-end gap-2 whitespace-nowrap"><b>Head Teacher&apos;s Remark:</b><input value={info.headTeacherRemark} onChange={(e) => setInfoValue("headTeacherRemark", e.target.value)} className="min-w-0 border-0 border-b border-black bg-transparent px-1 outline-none" /><span>Signature:</span><span className="border-b border-black" /></div>

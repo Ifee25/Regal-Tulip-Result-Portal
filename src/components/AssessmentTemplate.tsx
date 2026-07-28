@@ -23,6 +23,7 @@ type Info = {
   session: string; heightStart: string; heightEnd: string; age: string;
   weightStart: string; weightEnd: string; daysOpened: string; daysAbsent: string;
   nextTermBegins: string; classTeacher: string; classTeacherRemarks: string;
+  classTeacherRemarksContinued: string;
   classTeacherSignature: string; headTeacherRemarks: string;
   headTeacherSignature: string; reportDate: string;
 };
@@ -46,6 +47,7 @@ export default function AssessmentTemplate({ student_name, session, term, class_
     nextTermBegins: initialResult?.next_term_begins ?? "",
     classTeacher: initialResult?.class_teacher ?? "",
     classTeacherRemarks: initialResult?.class_teacher_remarks ?? "",
+    classTeacherRemarksContinued: initialResult?.class_teacher_remarks_continued ?? "",
     classTeacherSignature: initialResult?.class_teacher_signature ?? "",
     headTeacherRemarks: initialResult?.head_teacher_remarks ?? "",
     headTeacherSignature: initialResult?.head_teacher_signature ?? "",
@@ -162,6 +164,7 @@ export default function AssessmentTemplate({ student_name, session, term, class_
         days_school_opened: Number(info.daysOpened), days_absent: Number(info.daysAbsent),
         next_term_begins: info.nextTermBegins, class_teacher: info.classTeacher,
         class_teacher_remarks: info.classTeacherRemarks,
+        class_teacher_remarks_continued: info.classTeacherRemarksContinued,
         class_teacher_signature: info.classTeacherSignature,
         head_teacher_remarks: info.headTeacherRemarks,
         head_teacher_signature: info.headTeacherSignature, report_date: info.reportDate,
@@ -236,7 +239,11 @@ export default function AssessmentTemplate({ student_name, session, term, class_
               <label>CLASS TEACHER:<input value={info.classTeacher} onChange={(e) => updateInfo("classTeacher", e.target.value)} /></label>
               <label>CLASS TEACHER’S REMARKS:<input value={info.classTeacherRemarks} onChange={(e) => updateInfo("classTeacherRemarks", e.target.value)} /></label>
             </div>
-            <label className="center-signature"><input value={info.classTeacherSignature} onChange={(e) => updateInfo("classTeacherSignature", e.target.value)} /><span>SIGNATURE</span><i /></label>
+            <label className="center-signature">
+              <input aria-label="Continue class teacher remarks" value={info.classTeacherRemarksContinued} onChange={(e) => updateInfo("classTeacherRemarksContinued", e.target.value)} />
+              <span>SIGNATURE</span>
+              <input aria-label="Class teacher signature" value={info.classTeacherSignature} onChange={(e) => updateInfo("classTeacherSignature", e.target.value)} />
+            </label>
             <label>HEAD TEACHER’S REMARKS:<input value={info.headTeacherRemarks} onChange={(e) => updateInfo("headTeacherRemarks", e.target.value)} /></label>
             <div className="two-fields final-fields">
               <label>SIGNATURE<input value={info.headTeacherSignature} onChange={(e) => updateInfo("headTeacherSignature", e.target.value)} /></label>

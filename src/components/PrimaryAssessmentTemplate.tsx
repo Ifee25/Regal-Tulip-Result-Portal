@@ -47,6 +47,8 @@ export default function PrimaryAssessmentTemplate({ student_name, session, term,
     daysAbsent: initialResult?.days_absent?.toString() ?? "",
     nextTermBegins: initialResult?.next_term_begins ?? "",
     classTeacherRemark: initialResult?.class_teacher_remarks ?? "",
+    classTeacherRemarkContinued: initialResult?.class_teacher_remarks_continued ?? "",
+    classTeacherSignature: initialResult?.class_teacher_signature ?? "",
     headTeacherRemark: initialResult?.head_teacher_remarks ?? "",
   });
   const [loading, setLoading] = useState(false);
@@ -145,7 +147,10 @@ export default function PrimaryAssessmentTemplate({ student_name, session, term,
         height_start: info.heightStart, height_end: info.heightEnd,
         class_teacher: info.teacher, days_school_opened: Number(info.daysOpened),
         days_absent: Number(info.daysAbsent), next_term_begins: info.nextTermBegins,
-        class_teacher_remarks: info.classTeacherRemark, head_teacher_remarks: info.headTeacherRemark,
+        class_teacher_remarks: info.classTeacherRemark,
+        class_teacher_remarks_continued: info.classTeacherRemarkContinued,
+        class_teacher_signature: info.classTeacherSignature,
+        head_teacher_remarks: info.headTeacherRemark,
         primary_subjects: subjects.map((row, index) => ({ ...row, total: row.not_offered ? undefined : totals[index], remark: row.not_offered ? "" : getPrimaryRemark(totals[index], row.cat !== undefined || row.exam !== undefined) })),
         affective_traits: affectiveTraits, psychomotor_skills: psychomotorSkills,
       });
@@ -213,7 +218,12 @@ export default function PrimaryAssessmentTemplate({ student_name, session, term,
             <div className="mt-5 grid grid-cols-[1fr_2.4fr_1.45fr] gap-x-5 gap-y-4">
               {lineInput("daysOpened", "Number of times school opened:")}{lineInput("classTeacherRemark", "Class Teacher's Remark:")}
               <div className="grid grid-cols-2 gap-x-5 font-bold"><span>RATING KEY</span><span>H1: &nbsp;BEGINNING OF TERM</span></div>
-              {lineInput("daysAbsent", "Number of times absent:")}<div className="border-b border-black" />
+              {lineInput("daysAbsent", "Number of times absent:")}
+              <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
+                <input aria-label="Continue class teacher remarks" value={info.classTeacherRemarkContinued} onChange={(e) => setInfoValue("classTeacherRemarkContinued", e.target.value)} className="min-w-0 border-0 border-b border-black bg-transparent px-1 outline-none" />
+                <span>Signature:</span>
+                <input aria-label="Class teacher signature" value={info.classTeacherSignature} onChange={(e) => setInfoValue("classTeacherSignature", e.target.value)} className="min-w-0 border-0 border-b border-black bg-transparent px-1 outline-none" />
+              </div>
               <div className="grid grid-cols-2 gap-x-5 font-bold"><span>A: &nbsp;EXCELLENT</span><span>H2: &nbsp;END OF TERM</span></div>
               {lineInput("nextTermBegins", "Next Term Begins:")}{lineInput("headTeacherRemark", "Head Teacher's Remark:")}
               <div className="grid grid-cols-2 gap-x-5 font-bold"><span>B: &nbsp;GOOD</span><span>W1: &nbsp;BEGINNING OF TERM</span></div>
