@@ -1,12 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   PRIMARY_AFFECTIVE_TRAITS, PRIMARY_PSYCHOMOTOR_SKILLS, PRIMARY_THIRD_TERM_SUBJECTS,
   type AssessmentResult, type PrimaryRating, type PrimarySubjectResult,
 } from "@/types/assessment";
 import { getPrimaryRemark } from "@/lib/primaryRemark";
+import { splitTextToInputWidth } from "@/lib/inputTextFit";
 
 type Props = { student_name: string; session: string; term: string; class_name: string; priorTermResults: { first?: AssessmentResult; second?: AssessmentResult }; onSubmit: (result: AssessmentResult) => Promise<void>; onCancel: () => void; initialResult?: AssessmentResult; readOnly?: boolean; draftKey?: string; onEdit?: () => void; submitLabel?: string };
 type Info = { age: string; averageAge: string; session: string; numberInClass: string; position: string; weightStart: string; weightEnd: string; heightStart: string; heightEnd: string; teacher: string; daysOpened: string; daysAbsent: string; nextTermBegins: string; classTeacherRemark: string; classTeacherRemarkContinued: string; classTeacherSignature: string; headTeacherRemark: string };
@@ -44,6 +45,7 @@ export default function PrimaryThirdTermTemplate({ student_name, session, term, 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [draftReady, setDraftReady] = useState(false);
+  const remarksContinuationRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (readOnly || !draftKey) { setDraftReady(true); return; }
@@ -98,6 +100,25 @@ export default function PrimaryThirdTermTemplate({ student_name, session, term, 
   const annualTotalAverage = annualTermEntries ? grandAnnualTotal / annualTermEntries : 0;
 
   const setInfoValue = (key: keyof Info, value: string) => setInfo((old) => ({ ...old, [key]: value }));
+  const updateClassTeacherRemark = (value: string, input: HTMLInputElement) => {
+    const [firstLine, overflow] = splitTextToInputWidth(value, input);
+    setInfo((current) => ({
+      ...current,
+      classTeacherRemark: firstLine,
+      classTeacherRemarkContinued: overflow
+        ? `${overflow}${current.classTeacherRemarkContinued ? ` ${current.classTeacherRemarkContinued}` : ""}`
+        : current.classTeacherRemarkContinued,
+    }));
+    if (overflow) {
+      requestAnimationFrame(() => {
+        remarksContinuationRef.current?.focus();
+        remarksContinuationRef.current?.setSelectionRange(
+          remarksContinuationRef.current.value.length,
+          remarksContinuationRef.current.value.length,
+        );
+      });
+    }
+  };
   const updateSubject = (index: number, key: keyof PrimarySubjectResult, value: string) => {
     const draftId = `${index}:${String(key)}`;
     if (subjects[index].not_offered) {
@@ -160,11 +181,11 @@ export default function PrimaryThirdTermTemplate({ student_name, session, term, 
         </table>
         <div className="mt-6 grid grid-cols-[1.2fr_2.65fr_1.5fr] gap-x-6 gap-y-5">
           {line("daysOpened", "Number of times school opened:")}
-          {line("classTeacherRemark", "Class Teacher's Remark:")}
+          <label className="flex min-w-0 items-end gap-1 whitespace-nowrap"><b>Class Teacher&apos;s Remark:</b><input value={info.classTeacherRemark} onChange={(e) => updateClassTeacherRemark(e.target.value, e.target)} className="min-w-0 flex-1 border-0 border-b border-black bg-transparent px-1 outline-none" /></label>
           <div className="grid grid-cols-[1fr_auto] gap-4 font-bold"><span>RATING KEY</span><span className="whitespace-nowrap">H1: BEGINNING OF TERM</span></div>
           {line("daysAbsent", "Number of times absent:")}
           <div className="grid grid-cols-[1fr_auto_100px] items-end gap-2">
-            <input aria-label="Continue class teacher remarks" value={info.classTeacherRemarkContinued} onChange={(e) => setInfoValue("classTeacherRemarkContinued", e.target.value)} className="min-w-0 border-0 border-b border-black bg-transparent px-1 outline-none" />
+            <input ref={remarksContinuationRef} aria-label="Continue class teacher remarks" value={info.classTeacherRemarkContinued} onChange={(e) => setInfoValue("classTeacherRemarkContinued", e.target.value)} className="min-w-0 border-0 border-b border-black bg-transparent px-1 outline-none" />
             <span>Signature:</span>
             <input aria-label="Class teacher signature" value={info.classTeacherSignature} onChange={(e) => setInfoValue("classTeacherSignature", e.target.value)} className="min-w-0 border-0 border-b border-black bg-transparent px-1 outline-none" />
           </div>

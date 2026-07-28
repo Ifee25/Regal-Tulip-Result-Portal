@@ -1,8 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { AssessmentCategory, AssessmentResult, NURSERY_ASSESSMENTS } from "@/types/assessment";
+import { splitTextToInputWidth } from "@/lib/inputTextFit";
 
 interface Props {
   student_name: string;
@@ -56,6 +57,7 @@ export default function AssessmentTemplate({ student_name, session, term, class_
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [draftReady, setDraftReady] = useState(false);
+  const remarksContinuationRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (readOnly || !draftKey) { setDraftReady(true); return; }
@@ -85,6 +87,26 @@ export default function AssessmentTemplate({ student_name, session, term, class_
 
   const updateInfo = (field: keyof Info, value: string) =>
     setInfo((current) => ({ ...current, [field]: value }));
+
+  function updateClassTeacherRemarks(value: string, input: HTMLInputElement) {
+    const [firstLine, overflow] = splitTextToInputWidth(value, input);
+    setInfo((current) => ({
+      ...current,
+      classTeacherRemarks: firstLine,
+      classTeacherRemarksContinued: overflow
+        ? `${overflow}${current.classTeacherRemarksContinued ? ` ${current.classTeacherRemarksContinued}` : ""}`
+        : current.classTeacherRemarksContinued,
+    }));
+    if (overflow) {
+      requestAnimationFrame(() => {
+        remarksContinuationRef.current?.focus();
+        remarksContinuationRef.current?.setSelectionRange(
+          remarksContinuationRef.current.value.length,
+          remarksContinuationRef.current.value.length,
+        );
+      });
+    }
+  }
 
   function updateScore(categoryIndex: number, itemIndex: number, value: string) {
     const currentItem = assessments[categoryIndex].items[itemIndex];
@@ -237,10 +259,10 @@ export default function AssessmentTemplate({ student_name, session, term, class_
             <label>NEXT TERM BEGINS:<input value={info.nextTermBegins} onChange={(e) => updateInfo("nextTermBegins", e.target.value)} /></label>
             <div className="two-fields teacher-fields">
               <label>CLASS TEACHER:<input value={info.classTeacher} onChange={(e) => updateInfo("classTeacher", e.target.value)} /></label>
-              <label>CLASS TEACHER’S REMARKS:<input value={info.classTeacherRemarks} onChange={(e) => updateInfo("classTeacherRemarks", e.target.value)} /></label>
+              <label>CLASS TEACHER’S REMARKS:<input value={info.classTeacherRemarks} onChange={(e) => updateClassTeacherRemarks(e.target.value, e.target)} /></label>
             </div>
             <label className="center-signature">
-              <input aria-label="Continue class teacher remarks" value={info.classTeacherRemarksContinued} onChange={(e) => updateInfo("classTeacherRemarksContinued", e.target.value)} />
+              <input ref={remarksContinuationRef} aria-label="Continue class teacher remarks" value={info.classTeacherRemarksContinued} onChange={(e) => updateInfo("classTeacherRemarksContinued", e.target.value)} />
               <span>SIGNATURE</span>
               <input aria-label="Class teacher signature" value={info.classTeacherSignature} onChange={(e) => updateInfo("classTeacherSignature", e.target.value)} />
             </label>

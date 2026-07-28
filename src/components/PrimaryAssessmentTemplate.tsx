@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   PRIMARY_AFFECTIVE_TRAITS,
   PRIMARY_PSYCHOMOTOR_SKILLS,
@@ -11,6 +11,7 @@ import {
   type PrimarySubjectResult,
 } from "@/types/assessment";
 import { getPrimaryRemark } from "@/lib/primaryRemark";
+import { splitTextToInputWidth } from "@/lib/inputTextFit";
 
 type Props = {
   student_name: string;
@@ -54,6 +55,7 @@ export default function PrimaryAssessmentTemplate({ student_name, session, term,
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [draftReady, setDraftReady] = useState(false);
+  const remarksContinuationRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (readOnly || !draftKey) { setDraftReady(true); return; }
@@ -89,6 +91,25 @@ export default function PrimaryAssessmentTemplate({ student_name, session, term,
   const average = completedSubjects ? grandTotal / completedSubjects : 0;
 
   const setInfoValue = (key: keyof typeof info, value: string) => setInfo((old) => ({ ...old, [key]: value }));
+  const updateClassTeacherRemark = (value: string, input: HTMLInputElement) => {
+    const [firstLine, overflow] = splitTextToInputWidth(value, input);
+    setInfo((current) => ({
+      ...current,
+      classTeacherRemark: firstLine,
+      classTeacherRemarkContinued: overflow
+        ? `${overflow}${current.classTeacherRemarkContinued ? ` ${current.classTeacherRemarkContinued}` : ""}`
+        : current.classTeacherRemarkContinued,
+    }));
+    if (overflow) {
+      requestAnimationFrame(() => {
+        remarksContinuationRef.current?.focus();
+        remarksContinuationRef.current?.setSelectionRange(
+          remarksContinuationRef.current.value.length,
+          remarksContinuationRef.current.value.length,
+        );
+      });
+    }
+  };
   const updateSubject = (index: number, key: keyof PrimarySubjectResult, value: string) => {
     const draftId = `${index}:${String(key)}`;
     const currentRow = subjects[index];
@@ -216,11 +237,15 @@ export default function PrimaryAssessmentTemplate({ student_name, session, term,
             </table>
 
             <div className="mt-5 grid grid-cols-[1fr_2.4fr_1.45fr] gap-x-5 gap-y-4">
-              {lineInput("daysOpened", "Number of times school opened:")}{lineInput("classTeacherRemark", "Class Teacher's Remark:")}
+              {lineInput("daysOpened", "Number of times school opened:")}
+              <label className="flex min-w-0 items-end gap-1 whitespace-nowrap">
+                <b>Class Teacher&apos;s Remark:</b>
+                <input value={info.classTeacherRemark} onChange={(e) => updateClassTeacherRemark(e.target.value, e.target)} className="min-w-0 flex-1 border-0 border-b border-dotted border-black bg-transparent px-1 outline-none" />
+              </label>
               <div className="grid grid-cols-2 gap-x-5 font-bold"><span>RATING KEY</span><span>H1: &nbsp;BEGINNING OF TERM</span></div>
               {lineInput("daysAbsent", "Number of times absent:")}
               <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
-                <input aria-label="Continue class teacher remarks" value={info.classTeacherRemarkContinued} onChange={(e) => setInfoValue("classTeacherRemarkContinued", e.target.value)} className="min-w-0 border-0 border-b border-black bg-transparent px-1 outline-none" />
+                <input ref={remarksContinuationRef} aria-label="Continue class teacher remarks" value={info.classTeacherRemarkContinued} onChange={(e) => setInfoValue("classTeacherRemarkContinued", e.target.value)} className="min-w-0 border-0 border-b border-black bg-transparent px-1 outline-none" />
                 <span>Signature:</span>
                 <input aria-label="Class teacher signature" value={info.classTeacherSignature} onChange={(e) => setInfoValue("classTeacherSignature", e.target.value)} className="min-w-0 border-0 border-b border-black bg-transparent px-1 outline-none" />
               </div>
