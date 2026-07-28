@@ -99,6 +99,22 @@ svg {
   opacity: 1;
 }
 
+.batch-print .batch-result .no-print {
+  display: none !important;
+}
+
+@media print {
+  .batch-print .batch-result {
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .batch-print .batch-result:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+}
+
 @media print {
   @page {
     size: A4 landscape;
