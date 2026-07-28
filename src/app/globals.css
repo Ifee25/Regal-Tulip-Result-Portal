@@ -104,6 +104,16 @@ svg {
 }
 
 @media print {
+  @page primaryBatchResult {
+    size: A4 landscape;
+    margin: 4mm;
+  }
+
+  @page nurseryBatchResult {
+    size: A4 portrait;
+    margin: 0;
+  }
+
   .batch-print,
   .batch-print .batch-result {
     width: auto !important;
@@ -117,6 +127,10 @@ svg {
     page-break-after: always;
   }
 
+  .batch-print .batch-result-primary .primary-entry-page {
+    page: primaryBatchResult;
+  }
+
   .batch-print .batch-result-primary:last-child {
     break-after: auto;
     page-break-after: auto;
@@ -128,6 +142,7 @@ svg {
   }
 
   .batch-print .batch-result-nursery .nursery-page {
+    page: nurseryBatchResult;
     break-before: auto !important;
     page-break-before: auto !important;
     break-after: page !important;
