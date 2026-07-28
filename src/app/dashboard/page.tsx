@@ -849,20 +849,10 @@ export default function DashboardPage() {
                     ))}
                   </select>
                 </label>
-                <div className="flex flex-col items-start gap-2 sm:items-end">
-                  <p className="text-sm text-slate-600">
-                    Showing {filteredResults.length} upload{filteredResults.length === 1 ? "" : "s"}
-                    {resultsArmFilter === "All" ? " across all arms" : ` for ${resultsArmFilter}`}.
-                  </p>
-                  {mayControlStaffAccess && resultsArmFilter !== "All" && filteredResults.length > 0 && (
-                    <Link
-                      href={`/results/print-all?class=${encodeURIComponent(resultsArmFilter)}`}
-                      className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800"
-                    >
-                      Print All
-                    </Link>
-                  )}
-                </div>
+                <p className="text-sm text-slate-600">
+                  Showing {filteredResults.length} upload{filteredResults.length === 1 ? "" : "s"}
+                  {resultsArmFilter === "All" ? " across all arms" : ` for ${resultsArmFilter}`}.
+                </p>
               </div>
             )}
 
