@@ -104,14 +104,39 @@ svg {
 }
 
 @media print {
+  .batch-print,
   .batch-print .batch-result {
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  .batch-print .batch-result-primary {
     break-after: page;
     page-break-after: always;
   }
 
-  .batch-print .batch-result:last-child {
+  .batch-print .batch-result-primary:last-child {
     break-after: auto;
     page-break-after: auto;
+  }
+
+  .batch-print .batch-result-nursery {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  .batch-print .batch-result-nursery .nursery-page {
+    break-before: auto !important;
+    page-break-before: auto !important;
+    break-after: page !important;
+    page-break-after: always !important;
+  }
+
+  .batch-print .batch-result:last-child.batch-result-nursery .nursery-page:last-of-type {
+    break-after: auto !important;
+    page-break-after: auto !important;
   }
 }
 

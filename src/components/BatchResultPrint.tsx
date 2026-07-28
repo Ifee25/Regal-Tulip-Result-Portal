@@ -96,6 +96,7 @@ export default function BatchResultPrint({ className }: { className: string }) {
       {printableResults.length === 0 ? (
         <p className="p-8 text-center text-slate-700">No printable result sheets were found for {className}.</p>
       ) : printableResults.map(({ result, assessment }) => {
+        const isNursery = assessment.section === "Nursery";
         const sharedProps = {
           student_name: assessment.student_name || result.student_name,
           session: assessment.session ?? "",
@@ -108,8 +109,11 @@ export default function BatchResultPrint({ className }: { className: string }) {
         };
 
         return (
-          <section key={result.id} className="batch-result">
-            {assessment.section === "Nursery" ? (
+          <section
+            key={result.id}
+            className={`batch-result ${isNursery ? "batch-result-nursery" : "batch-result-primary"}`}
+          >
+            {isNursery ? (
               <AssessmentTemplate {...sharedProps} section="Nursery" />
             ) : assessment.term === "3rd Term" ? (
               <PrimaryThirdTermTemplate {...sharedProps} priorTermResults={{}} />
