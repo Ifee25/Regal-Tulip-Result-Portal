@@ -24,6 +24,7 @@ const nurseryClassOptions = ["Nursery 1", "Nursery 2", "Nursery 3"].flatMap((cla
 const primaryClassOptions = ["Primary 1", "Primary 2", "Primary 3", "Primary 4", "Primary 5", "Primary 6"].flatMap((className) =>
   classArms.map((arm) => `${className}${arm}`),
 );
+const allClassOptions = [...nurseryClassOptions, ...primaryClassOptions];
 const sessionOptions = ["2021/2022", "2022/2023", "2023/2024", "2024/2025", "2025/2026", "2026/2027"];
 
 export default function DashboardPage() {
@@ -34,6 +35,7 @@ export default function DashboardPage() {
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [resultsMessage, setResultsMessage] = useState<string | null>(null);
+  const [resultsArmFilter, setResultsArmFilter] = useState("All");
   const [form, setForm] = useState({ student_name: "", session: "2025/2026" });
   const [selectedTerm, setSelectedTerm] = useState(termOptions[0].value);
   const [selectedSection, setSelectedSection] = useState<"Nursery" | "Primary">("Nursery");
@@ -525,6 +527,14 @@ export default function DashboardPage() {
   }
 
   const primaryResults = results.filter((row) => !isNurseryResult(row));
+  const armUploadCounts = results.reduce<Record<string, number>>((counts, row) => {
+    const className = String(row.class_name ?? "");
+    if (className) counts[className] = (counts[className] ?? 0) + 1;
+    return counts;
+  }, {});
+  const filteredResults = isAdmin && resultsArmFilter !== "All"
+    ? results.filter((row) => row.class_name === resultsArmFilter)
+    : results;
   const averageScore = primaryResults.length
     ? Math.round(primaryResults.reduce((sum, row) => sum + getTermAverage(row), 0) / primaryResults.length)
     : 0;
@@ -822,27 +832,54 @@ export default function DashboardPage() {
               <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{resultsMessage}</p>
             )}
 
+            {isAdmin && (
+              <div className="mt-5 flex flex-col gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-end sm:justify-between">
+                <label className="block w-full sm:max-w-xs">
+                  <span className="mb-1 block text-sm font-semibold text-slate-700">View uploads by class arm</span>
+                  <select
+                    value={resultsArmFilter}
+                    onChange={(event) => setResultsArmFilter(event.target.value)}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
+                  >
+                    <option value="All">All class arms ({results.length})</option>
+                    {allClassOptions.map((className) => (
+                      <option key={className} value={className}>
+                        {className} ({armUploadCounts[className] ?? 0})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <p className="text-sm text-slate-600">
+                  Showing {filteredResults.length} upload{filteredResults.length === 1 ? "" : "s"}
+                  {resultsArmFilter === "All" ? " across all arms" : ` for ${resultsArmFilter}`}.
+                </p>
+              </div>
+            )}
+
             {loading ? (
               <p className="mt-6 text-sm text-slate-500">Loading results...</p>
             ) : (
               <div className="mt-6 max-w-full overflow-x-auto rounded-2xl border border-slate-200 [-webkit-overflow-scrolling:touch]">
-                <table className="min-w-[680px] divide-y divide-slate-200 text-sm">
+                <table className="min-w-[850px] divide-y divide-slate-200 text-sm">
                   <thead className="bg-slate-50">
                     <tr>
                       <th className="px-4 py-3 text-left font-semibold text-slate-600">Student</th>
                       <th className="px-4 py-3 text-left font-semibold text-slate-600">Class</th>
                       <th className="px-4 py-3 text-left font-semibold text-slate-600">Term</th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-600">Uploaded by</th>
                       <th className="px-4 py-3 text-left font-semibold text-slate-600">Average</th>
                       <th className="px-4 py-3 text-right font-semibold text-slate-600">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white">
-                    {results.length === 0 && (
+                    {filteredResults.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="px-4 py-10 text-center text-slate-500">No results have been uploaded yet.</td>
+                        <td colSpan={6} className="px-4 py-10 text-center text-slate-500">
+                          {resultsArmFilter === "All" ? "No results have been uploaded yet." : `No results have been uploaded for ${resultsArmFilter}.`}
+                        </td>
                       </tr>
                     )}
-                    {results.map((r) => (
+                    {filteredResults.map((r) => (
                       <tr key={r.id} className="hover:bg-slate-50">
                         <td className="px-4 py-3">
                           {r.student_name}
@@ -852,6 +889,9 @@ export default function DashboardPage() {
                         </td>
                         <td className="px-4 py-3">
                           {r.term}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {r.uploaded_by_email || (String(r.id).startsWith("local-") ? "Browser-saved" : "Not recorded")}
                         </td>
                         <td className="px-4 py-3 font-semibold text-emerald-600">
                           {isNurseryResult(r) ? (
