@@ -57,6 +57,8 @@ export default function AssessmentTemplate({ student_name, session, term, class_
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [draftReady, setDraftReady] = useState(false);
+  const didReflowRemarksRef = useRef(false);
+  const remarksFirstLineRef = useRef<HTMLInputElement>(null);
   const remarksContinuationRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -79,6 +81,20 @@ export default function AssessmentTemplate({ student_name, session, term, class_
       window.localStorage.setItem(draftKey, JSON.stringify({ assessments, info }));
     }
   }, [assessments, info, draftKey, draftReady, readOnly]);
+
+  useEffect(() => {
+    if (didReflowRemarksRef.current) return;
+    didReflowRemarksRef.current = true;
+    const input = remarksFirstLineRef.current;
+    if (!input) return;
+    const [firstLine, overflow] = splitTextToInputWidth(info.classTeacherRemarks, input);
+    if (!overflow) return;
+    setInfo((current) => ({
+      ...current,
+      classTeacherRemarks: firstLine,
+      classTeacherRemarksContinued: `${overflow}${current.classTeacherRemarksContinued ? ` ${current.classTeacherRemarksContinued}` : ""}`,
+    }));
+  }, []);
 
   function cancel() {
     if (draftKey) window.localStorage.removeItem(draftKey);
@@ -259,7 +275,7 @@ export default function AssessmentTemplate({ student_name, session, term, class_
             <label>NEXT TERM BEGINS:<input value={info.nextTermBegins} onChange={(e) => updateInfo("nextTermBegins", e.target.value)} /></label>
             <div className="two-fields teacher-fields">
               <label>CLASS TEACHER:<input value={info.classTeacher} onChange={(e) => updateInfo("classTeacher", e.target.value)} /></label>
-              <label>CLASS TEACHER’S REMARKS:<input value={info.classTeacherRemarks} onChange={(e) => updateClassTeacherRemarks(e.target.value, e.target)} /></label>
+              <label>CLASS TEACHER’S REMARKS:<input ref={remarksFirstLineRef} value={info.classTeacherRemarks} onChange={(e) => updateClassTeacherRemarks(e.target.value, e.target)} /></label>
             </div>
             <label className="center-signature">
               <input ref={remarksContinuationRef} aria-label="Continue class teacher remarks" value={info.classTeacherRemarksContinued} onChange={(e) => updateInfo("classTeacherRemarksContinued", e.target.value)} />

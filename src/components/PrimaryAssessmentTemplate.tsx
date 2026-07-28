@@ -55,6 +55,8 @@ export default function PrimaryAssessmentTemplate({ student_name, session, term,
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [draftReady, setDraftReady] = useState(false);
+  const didReflowRemarksRef = useRef(false);
+  const remarksFirstLineRef = useRef<HTMLInputElement>(null);
   const remarksContinuationRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -79,6 +81,20 @@ export default function PrimaryAssessmentTemplate({ student_name, session, term,
       window.localStorage.setItem(draftKey, JSON.stringify({ subjects, affectiveTraits, psychomotorSkills, info }));
     }
   }, [subjects, affectiveTraits, psychomotorSkills, info, draftKey, draftReady, readOnly]);
+
+  useEffect(() => {
+    if (didReflowRemarksRef.current) return;
+    didReflowRemarksRef.current = true;
+    const input = remarksFirstLineRef.current;
+    if (!input) return;
+    const [firstLine, overflow] = splitTextToInputWidth(info.classTeacherRemark, input);
+    if (!overflow) return;
+    setInfo((current) => ({
+      ...current,
+      classTeacherRemark: firstLine,
+      classTeacherRemarkContinued: `${overflow}${current.classTeacherRemarkContinued ? ` ${current.classTeacherRemarkContinued}` : ""}`,
+    }));
+  }, []);
 
   function cancel() {
     if (draftKey) window.localStorage.removeItem(draftKey);
@@ -240,7 +256,7 @@ export default function PrimaryAssessmentTemplate({ student_name, session, term,
               {lineInput("daysOpened", "Number of times school opened:")}
               <label className="flex min-w-0 items-end gap-1 whitespace-nowrap">
                 <b>Class Teacher&apos;s Remark:</b>
-                <input value={info.classTeacherRemark} onChange={(e) => updateClassTeacherRemark(e.target.value, e.target)} className="min-w-0 flex-1 border-0 border-b border-dotted border-black bg-transparent px-1 outline-none" />
+                <input ref={remarksFirstLineRef} value={info.classTeacherRemark} onChange={(e) => updateClassTeacherRemark(e.target.value, e.target)} className="min-w-0 flex-1 border-0 border-b border-dotted border-black bg-transparent px-1 outline-none" />
               </label>
               <div className="grid grid-cols-2 gap-x-5 font-bold"><span>RATING KEY</span><span>H1: &nbsp;BEGINNING OF TERM</span></div>
               {lineInput("daysAbsent", "Number of times absent:")}

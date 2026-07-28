@@ -45,6 +45,8 @@ export default function PrimaryThirdTermTemplate({ student_name, session, term, 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [draftReady, setDraftReady] = useState(false);
+  const didReflowRemarksRef = useRef(false);
+  const remarksFirstLineRef = useRef<HTMLInputElement>(null);
   const remarksContinuationRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -69,6 +71,20 @@ export default function PrimaryThirdTermTemplate({ student_name, session, term, 
       window.localStorage.setItem(draftKey, JSON.stringify({ subjects, affective, psychomotor, info }));
     }
   }, [subjects, affective, psychomotor, info, draftKey, draftReady, readOnly]);
+
+  useEffect(() => {
+    if (didReflowRemarksRef.current) return;
+    didReflowRemarksRef.current = true;
+    const input = remarksFirstLineRef.current;
+    if (!input) return;
+    const [firstLine, overflow] = splitTextToInputWidth(info.classTeacherRemark, input);
+    if (!overflow) return;
+    setInfo((current) => ({
+      ...current,
+      classTeacherRemark: firstLine,
+      classTeacherRemarkContinued: `${overflow}${current.classTeacherRemarkContinued ? ` ${current.classTeacherRemarkContinued}` : ""}`,
+    }));
+  }, []);
 
   function cancel() {
     if (draftKey) window.localStorage.removeItem(draftKey);
@@ -181,7 +197,7 @@ export default function PrimaryThirdTermTemplate({ student_name, session, term, 
         </table>
         <div className="mt-6 grid grid-cols-[1.2fr_2.65fr_1.5fr] gap-x-6 gap-y-5">
           {line("daysOpened", "Number of times school opened:")}
-          <label className="flex min-w-0 items-end gap-1 whitespace-nowrap"><b>Class Teacher&apos;s Remark:</b><input value={info.classTeacherRemark} onChange={(e) => updateClassTeacherRemark(e.target.value, e.target)} className="min-w-0 flex-1 border-0 border-b border-black bg-transparent px-1 outline-none" /></label>
+          <label className="flex min-w-0 items-end gap-1 whitespace-nowrap"><b>Class Teacher&apos;s Remark:</b><input ref={remarksFirstLineRef} value={info.classTeacherRemark} onChange={(e) => updateClassTeacherRemark(e.target.value, e.target)} className="min-w-0 flex-1 border-0 border-b border-black bg-transparent px-1 outline-none" /></label>
           <div className="grid grid-cols-[1fr_auto] gap-4 font-bold"><span>RATING KEY</span><span className="whitespace-nowrap">H1: BEGINNING OF TERM</span></div>
           {line("daysAbsent", "Number of times absent:")}
           <div className="grid grid-cols-[1fr_auto_100px] items-end gap-2">
