@@ -129,6 +129,11 @@ svg {
 
   .batch-print .batch-result-primary .primary-entry-page {
     page: primaryBatchResult;
+    overflow: visible !important;
+  }
+
+  .batch-print .batch-result-primary .primary-entry-page form {
+    overflow: visible !important;
   }
 
   .batch-print .batch-result-primary:last-child {
