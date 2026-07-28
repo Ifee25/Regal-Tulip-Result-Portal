@@ -27,6 +27,17 @@ const primaryClassOptions = ["Primary 1", "Primary 2", "Primary 3", "Primary 4",
 const allClassOptions = [...nurseryClassOptions, ...primaryClassOptions];
 const sessionOptions = ["2021/2022", "2022/2023", "2023/2024", "2024/2025", "2025/2026", "2026/2027"];
 
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, entryValue]) => `${JSON.stringify(key)}:${stableJson(entryValue)}`);
+    return `{${entries.join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "null";
+}
+
 export default function DashboardPage() {
   const [supabase, setSupabase] = useState<any | null>(null);
   const supabaseRef = useRef<any | null>(null);
@@ -50,6 +61,8 @@ export default function DashboardPage() {
   const [showAssessmentTemplate, setShowAssessmentTemplate] = useState(false);
   const [priorPrimaryResults, setPriorPrimaryResults] = useState<{ first?: AssessmentResult; second?: AssessmentResult }>({});
   const [entryStateReady, setEntryStateReady] = useState(false);
+  const [syncingPendingResults, setSyncingPendingResults] = useState(false);
+  const pendingSyncRunningRef = useRef(false);
   const normalizedUserEmail = user?.email?.trim().toLowerCase() ?? "";
   const isAdmin = Boolean(user) && isPortalAdmin(normalizedUserEmail);
   const mayControlStaffAccess = Boolean(user) && canControlStaffAccess(normalizedUserEmail);
@@ -237,6 +250,14 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!user || !supabase) return;
+    const retryPendingUploads = () => void syncPendingUploads();
+    void syncPendingUploads();
+    window.addEventListener("online", retryPendingUploads);
+    return () => window.removeEventListener("online", retryPendingUploads);
+  }, [user?.id, supabase]);
+
+  useEffect(() => {
+    if (!user || !supabase) return;
 
     const refreshResults = () => void fetchResults();
     const resultChanges = supabase
@@ -336,6 +357,100 @@ export default function DashboardPage() {
       setIsSupabaseUnavailable(true);
     }
     if (!signal?.aborted) setLoading(false);
+  }
+
+  async function syncPendingUploads(onlyIds?: string[]) {
+    if (!supabase || !user || pendingSyncRunningRef.current) return;
+
+    const currentEmail = String(user.email ?? "").trim().toLowerCase();
+    const requestedIds = onlyIds ? new Set(onlyIds) : null;
+    const pendingRows = readLocalResults().filter((row) => {
+      if (!String(row.id).startsWith("local-")) return false;
+      if (requestedIds && !requestedIds.has(String(row.id))) return false;
+      const ownerEmail = String(row.uploaded_by_email ?? "").trim().toLowerCase();
+      return row.uploaded_by === user.id || Boolean(ownerEmail && ownerEmail === currentEmail);
+    });
+    if (!pendingRows.length) return;
+
+    pendingSyncRunningRef.current = true;
+    setSyncingPendingResults(true);
+    let syncedCount = 0;
+    let failedCount = 0;
+
+    try {
+      for (const pending of pendingRows) {
+        const localId = String(pending.id);
+        const assessment = pending.assessment_data as AssessmentResult | undefined;
+        const session = String(assessment?.session ?? "");
+        let existingQuery = supabase
+          .from("students")
+          .select("id, student_name, class_name, term, average_score, assessment_data, created_at, uploaded_by, uploaded_by_email")
+          .eq("uploaded_by", user.id)
+          .eq("student_name", pending.student_name)
+          .eq("class_name", pending.class_name)
+          .eq("term", pending.term)
+          .order("created_at", { ascending: false })
+          .limit(1);
+        if (session) existingQuery = existingQuery.eq("assessment_data->>session", session);
+
+        const { data: existingRows, error: lookupError } = await existingQuery;
+        const existingMatch = !lookupError ? existingRows?.[0] : undefined;
+        let remoteResult = existingMatch
+          && stableJson(existingMatch.assessment_data) === stableJson(pending.assessment_data)
+          ? existingMatch
+          : undefined;
+
+        if (!remoteResult) {
+          const payload = {
+            student_name: pending.student_name,
+            class_name: pending.class_name,
+            term: pending.term,
+            average_score: pending.average_score,
+            assessment_data: pending.assessment_data,
+            uploaded_by: user.id,
+            uploaded_by_email: currentEmail || null,
+          };
+          const { data, error } = await supabase
+            .from("students")
+            .insert([payload])
+            .select("id, student_name, class_name, term, average_score, assessment_data, created_at, uploaded_by, uploaded_by_email")
+            .single();
+          if (error || !data) {
+            failedCount += 1;
+            const updatedPending = {
+              ...pending,
+              pending_upload: true,
+              sync_error: error?.message ?? "Supabase did not confirm this upload.",
+            };
+            try {
+              window.localStorage.setItem(`regal-tulip-result:${localId}`, JSON.stringify(updatedPending));
+            } catch {
+              // Keep the in-memory copy when browser storage is unavailable.
+            }
+            setResults((rows) => rows.map((row) => row.id === localId ? updatedPending : row));
+            continue;
+          }
+          remoteResult = data;
+        }
+
+        window.localStorage.removeItem(`regal-tulip-result:${localId}`);
+        syncedCount += 1;
+        setResults((rows) => [
+          remoteResult,
+          ...rows.filter((row) => row.id !== localId && row.id !== remoteResult.id),
+        ]);
+      }
+
+      if (syncedCount > 0) await fetchResults();
+      if (failedCount > 0) {
+        setResultsMessage(`${failedCount} pending result${failedCount === 1 ? "" : "s"} could not be uploaded yet. They remain safely stored on this device; use Retry when the connection or account access is corrected.`);
+      } else if (syncedCount > 0) {
+        setResultsMessage(`${syncedCount} pending result${syncedCount === 1 ? "" : "s"} uploaded successfully and can now be seen by the administrator.`);
+      }
+    } finally {
+      pendingSyncRunningRef.current = false;
+      setSyncingPendingResults(false);
+    }
   }
 
   async function handleCreateClick(e: React.FormEvent) {
@@ -446,6 +561,8 @@ export default function DashboardPage() {
         id: `local-${Date.now()}`,
         ...payload,
         created_at: new Date().toISOString(),
+        pending_upload: true,
+        sync_error: "Supabase is unavailable.",
       };
       storeLocalResult(localResult);
       setResults((prev) => [localResult, ...prev]);
@@ -454,7 +571,7 @@ export default function DashboardPage() {
       setSelectedSection("Nursery");
       setSelectedClassName(nurseryClassOptions[0]);
       setShowAssessmentTemplate(false);
-      setAccessMessage("Result saved locally (Supabase unavailable).");
+      setAccessMessage("Not uploaded yet. The result is safely stored on this device and marked Pending Upload.");
       return;
     }
 
@@ -470,10 +587,12 @@ export default function DashboardPage() {
           id: `local-${Date.now()}`,
           ...payload,
           created_at: new Date().toISOString(),
+          pending_upload: true,
+          sync_error: error.message,
         };
         storeLocalResult(localResult);
         setResults((prev) => [localResult, ...prev]);
-        setAccessMessage("Result saved locally (Supabase error).");
+        setAccessMessage("Not uploaded yet. The result is safely stored on this device and marked Pending Upload.");
       } else if (savedResult) {
         setAccessMessage("Result submitted successfully.");
         setResults((prev) => [savedResult, ...prev]);
@@ -487,10 +606,12 @@ export default function DashboardPage() {
         id: `local-${Date.now()}`,
         ...payload,
         created_at: new Date().toISOString(),
+        pending_upload: true,
+        sync_error: error instanceof Error ? error.message : "Network error.",
       };
       storeLocalResult(localResult);
       setResults((prev) => [localResult, ...prev]);
-      setAccessMessage("Result saved locally (network error).");
+      setAccessMessage("Not uploaded yet. The result is safely stored on this device and marked Pending Upload.");
     }
 
     setForm({ student_name: "", session: "2025/2026" });
@@ -527,6 +648,7 @@ export default function DashboardPage() {
   }
 
   const primaryResults = results.filter((row) => !isNurseryResult(row));
+  const pendingUploadCount = results.filter((row) => String(row.id).startsWith("local-")).length;
   const armUploadCounts = results.reduce<Record<string, number>>((counts, row) => {
     const className = String(row.class_name ?? "");
     if (className) counts[className] = (counts[className] ?? 0) + 1;
@@ -832,6 +954,23 @@ export default function DashboardPage() {
               <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{resultsMessage}</p>
             )}
 
+            {pendingUploadCount > 0 && (
+              <div className="mt-4 flex flex-col gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+                <p>
+                  <b>{pendingUploadCount} result{pendingUploadCount === 1 ? "" : "s"} pending upload.</b>{" "}
+                  These results are stored only on this device and are not yet visible to the administrator.
+                </p>
+                <button
+                  type="button"
+                  disabled={syncingPendingResults}
+                  onClick={() => void syncPendingUploads()}
+                  className="shrink-0 rounded-lg bg-amber-600 px-4 py-2 font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+                >
+                  {syncingPendingResults ? "Retrying..." : "Retry All Uploads"}
+                </button>
+              </div>
+            )}
+
             {isAdmin && (
               <div className="mt-5 flex flex-col gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-end sm:justify-between">
                 <label className="block w-full sm:max-w-xs">
@@ -881,7 +1020,15 @@ export default function DashboardPage() {
                     {filteredResults.map((r) => (
                       <tr key={r.id} className="hover:bg-slate-50">
                         <td className="px-4 py-3">
-                          {r.student_name}
+                          <div>{r.student_name}</div>
+                          {String(r.id).startsWith("local-") && (
+                            <div className="mt-1">
+                              <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                                Pending Upload
+                              </span>
+                              {r.sync_error && <p className="mt-1 max-w-xs text-xs text-amber-700">{r.sync_error}</p>}
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           {r.class_name}
@@ -898,6 +1045,16 @@ export default function DashboardPage() {
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex justify-end gap-2">
+                              {String(r.id).startsWith("local-") && (
+                                <button
+                                  type="button"
+                                  disabled={syncingPendingResults}
+                                  onClick={() => void syncPendingUploads([String(r.id)])}
+                                  className="rounded bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+                                >
+                                  {syncingPendingResults ? "Retrying..." : "Retry Upload"}
+                                </button>
+                              )}
                               <Link href={`/results/${r.id}`} onClick={() => {
                                 try {
                                   const prefix = String(r.id).startsWith("local-") ? "regal-tulip-result:" : "regal-tulip-review:";
