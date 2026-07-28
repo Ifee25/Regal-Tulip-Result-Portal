@@ -14,7 +14,7 @@ export const STAFF_CLASS_ASSIGNMENTS: Readonly<Record<string, readonly string[]>
   "dreafou@gmail.com": ["Primary 6R"],
   "honestaewelum@gmail.com": ["Primary 5R"],
   "enibejennifer33@gmail.com": ["Primary 1T"],
-  "nnk33423@gmail.com": ["Primary 3T"],
+  "nzekwenkechi4@gmail.com": ["Primary 3T"],
   "kelechukwuchidimma32@gmail.com": ["Primary 4R"],
   "kinkymomee352@gmail.com": ["Primary 1R"],
   "ezeibeoluebube2@gmail.com": ["Primary 2R"],

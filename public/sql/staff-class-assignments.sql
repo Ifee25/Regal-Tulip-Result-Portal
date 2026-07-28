@@ -46,7 +46,7 @@ INSERT INTO public.staff_class_assignments (email, class_name) VALUES
   ('dreafou@gmail.com', 'Primary 6R'),
   ('honestaewelum@gmail.com', 'Primary 5R'),
   ('enibejennifer33@gmail.com', 'Primary 1T'),
-  ('giftchidimma0224@gmail.com', 'Primary 3T'),
+  ('nzekwenkechi4@gmail.com', 'Primary 3T'),
   ('kelechukwuchidimma32@gmail.com', 'Primary 4R'),
   ('kinkymomee352@gmail.com', 'Primary 1R'),
   ('ezeibeoluebube2@gmail.com', 'Primary 2R'),
