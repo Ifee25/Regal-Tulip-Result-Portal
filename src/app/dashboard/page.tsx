@@ -860,13 +860,12 @@ export default function DashboardPage() {
               <p className="mt-6 text-sm text-slate-500">Loading results...</p>
             ) : (
               <div className="mt-6 max-w-full overflow-x-auto rounded-2xl border border-slate-200 [-webkit-overflow-scrolling:touch]">
-                <table className="min-w-[850px] divide-y divide-slate-200 text-sm">
+                <table className="min-w-[680px] divide-y divide-slate-200 text-sm">
                   <thead className="bg-slate-50">
                     <tr>
                       <th className="px-4 py-3 text-left font-semibold text-slate-600">Student</th>
                       <th className="px-4 py-3 text-left font-semibold text-slate-600">Class</th>
                       <th className="px-4 py-3 text-left font-semibold text-slate-600">Term</th>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-600">Uploaded by</th>
                       <th className="px-4 py-3 text-left font-semibold text-slate-600">Average</th>
                       <th className="px-4 py-3 text-right font-semibold text-slate-600">Actions</th>
                     </tr>
@@ -874,7 +873,7 @@ export default function DashboardPage() {
                   <tbody className="divide-y divide-slate-100 bg-white">
                     {filteredResults.length === 0 && (
                       <tr>
-                        <td colSpan={6} className="px-4 py-10 text-center text-slate-500">
+                        <td colSpan={5} className="px-4 py-10 text-center text-slate-500">
                           {resultsArmFilter === "All" ? "No results have been uploaded yet." : `No results have been uploaded for ${resultsArmFilter}.`}
                         </td>
                       </tr>
@@ -889,9 +888,6 @@ export default function DashboardPage() {
                         </td>
                         <td className="px-4 py-3">
                           {r.term}
-                        </td>
-                        <td className="px-4 py-3 text-slate-600">
-                          {r.uploaded_by_email || (String(r.id).startsWith("local-") ? "Browser-saved" : "Not recorded")}
                         </td>
                         <td className="px-4 py-3 font-semibold text-emerald-600">
                           {isNurseryResult(r) ? (
