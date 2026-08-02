@@ -706,9 +706,6 @@ export default function DashboardPage() {
     return scores.length ? (scores.reduce((sum, score) => sum + score, 0) / scores.length).toFixed(1) : "";
   }
 
-  function cacheBatchForPrinting() {
-    window.localStorage.setItem("regal-tulip-print-batch", JSON.stringify(filteredResults));
-  }
   const averageScore = primaryResults.length
     ? Math.round(primaryResults.reduce((sum, row) => sum + getTermAverage(row), 0) / primaryResults.length)
     : 0;
@@ -1052,13 +1049,6 @@ export default function DashboardPage() {
                     <button type="button" onClick={() => setShowArmSummary((shown) => !shown)} className="rounded-lg border border-sky-700 px-3 py-2 text-sm font-semibold text-sky-800 hover:bg-sky-50">
                       {showArmSummary ? "Hide summary" : "View spreadsheet summary"}
                     </button>
-                    <Link
-                      href={`/results/print-all?className=${encodeURIComponent(resultsArmFilter)}`}
-                      onClick={cacheBatchForPrinting}
-                      className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-800"
-                    >
-                      Print all
-                    </Link>
                   </div>
                 )}
               </div>
