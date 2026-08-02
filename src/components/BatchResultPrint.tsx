@@ -71,7 +71,10 @@ export default function BatchResultPrint({ className }: { className: string }) {
           onCancel: () => {},
         };
         return (
-          <section key={row.id} className="batch-result">
+          <section
+            key={row.id}
+            className={`batch-result ${assessment.section === "Nursery" ? "batch-nursery-result" : "batch-primary-result"}`}
+          >
             {assessment.section === "Nursery"
               ? <AssessmentTemplate {...common} section="Nursery" />
               : assessment.term === "3rd Term"
@@ -83,13 +86,50 @@ export default function BatchResultPrint({ className }: { className: string }) {
 
       <style jsx global>{`
         @media print {
-          .batch-result {
+          /*
+           * Preserve the exact single-result Primary print canvas (A4 landscape)
+           * and keep that entire canvas in one print fragment. The sheet's own
+           * scaling and clipping rules remain untouched.
+           */
+          .batch-primary-result {
+            position: relative !important;
+            width: 289mm !important;
+            height: 202mm !important;
+            margin: 0 !important;
+            overflow: visible !important;
+            break-inside: avoid-page !important;
+            page-break-inside: avoid !important;
             break-after: page;
             page-break-after: always;
           }
-          .batch-result:last-child {
+          .batch-primary-result .primary-entry-page,
+          .batch-primary-result .primary-entry-page form {
+            break-inside: avoid-page !important;
+            page-break-inside: avoid !important;
+          }
+          .batch-primary-result:last-child {
             break-after: auto;
             page-break-after: auto;
+          }
+
+          /*
+           * Nursery sheets already paginate themselves into two portrait pages.
+           * Add a break only after both pages so the next pupil cannot share the
+           * final Nursery page.
+           */
+          .batch-nursery-result {
+            break-after: page;
+            page-break-after: always;
+          }
+          .batch-nursery-result:last-child {
+            break-after: auto;
+            page-break-after: auto;
+          }
+
+          /* Fallback for any legacy record without a recognised section. */
+          .batch-result {
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
           }
         }
       `}</style>
