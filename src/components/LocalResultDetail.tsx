@@ -32,10 +32,12 @@ function parseAssessment(value: unknown): AssessmentResult | null {
   }
 }
 
-export default function LocalResultDetail({ id, startInEditMode = false }: { id: string; startInEditMode?: boolean }) {
+export default function LocalResultDetail({ id, startInEditMode = false, returnClassName }: { id: string; startInEditMode?: boolean; returnClassName?: string }) {
   const [result, setResult] = useState<LocalResult | null | undefined>(undefined);
   const [editing, setEditing] = useState(false);
   const [canEdit, setCanEdit] = useState(false);
+  const [editedStudentName, setEditedStudentName] = useState("");
+  const backToResults = `/dashboard${returnClassName ? `?className=${encodeURIComponent(returnClassName)}` : ""}#results`;
 
   useEffect(() => {
     let cancelled = false;
@@ -67,6 +69,7 @@ export default function LocalResultDetail({ id, startInEditMode = false }: { id:
         if (startInEditMode && (isAdmin || isOwner)) setEditing(true);
         cachedResult = parsed && (isAdmin || isOwner) ? parsed : null;
         setResult(cachedResult);
+        if (cachedResult) setEditedStudentName(cachedResult.student_name);
       } catch {
         setResult(null);
       }
@@ -86,6 +89,7 @@ export default function LocalResultDetail({ id, startInEditMode = false }: { id:
               setCanEdit(isPortalAdmin(currentUser.email) || isOwner);
               if (startInEditMode && (isPortalAdmin(currentUser.email) || isOwner)) setEditing(true);
               setResult(remoteResult);
+              setEditedStudentName(remoteResult.student_name);
               try {
                 window.localStorage.setItem(`regal-tulip-review:${id}`, JSON.stringify(remoteResult));
               } catch {
@@ -153,18 +157,22 @@ export default function LocalResultDetail({ id, startInEditMode = false }: { id:
     return <main className="min-h-screen p-8 text-sm text-slate-600">Loading result...</main>;
   }
   if (!result) {
-    return <main className="min-h-screen p-4 sm:p-8"><div className="mx-auto max-w-3xl"><p className="text-sm text-red-600">Result not found.</p><Link href="/dashboard#results" className="mt-4 inline-block text-sm text-sky-700">Back to Result Manager</Link></div></main>;
+    return <main className="min-h-screen p-4 sm:p-8"><div className="mx-auto max-w-3xl"><p className="text-sm text-red-600">Result not found.</p><Link href={backToResults} className="mt-4 inline-block text-sm text-sky-700">Back to Result Manager</Link></div></main>;
   }
 
   const assessment = parseAssessment(result.assessment_data);
   if (assessment) {
     const saveResult = async (updatedAssessment: AssessmentResult) => {
       if (!canEdit) throw new Error("You do not have permission to edit this result.");
+      const correctedName = editedStudentName.trim();
+      if (!correctedName) throw new Error("Pupil name cannot be empty.");
+      updatedAssessment = { ...updatedAssessment, student_name: correctedName };
       const totals = (updatedAssessment.primary_subjects ?? [])
         .filter((subject) => !subject.not_offered && subject.total !== undefined)
         .map((subject) => subject.total as number);
       let updated: LocalResult = {
         ...result,
+        student_name: correctedName,
         average_score: updatedAssessment.section === "Primary" && totals.length
           ? Number((totals.reduce((sum, score) => sum + score, 0) / totals.length).toFixed(2))
           : 0,
@@ -177,6 +185,7 @@ export default function LocalResultDetail({ id, startInEditMode = false }: { id:
         const supabase = getBrowserSupabase();
         if (!supabase) throw new Error("The database is unavailable. Please try again.");
         const { error } = await supabase.from("students").update({
+          student_name: correctedName,
           average_score: updated.average_score,
           assessment_data: updated.assessment_data,
         }).eq("id", id);
@@ -193,30 +202,47 @@ export default function LocalResultDetail({ id, startInEditMode = false }: { id:
       setEditing(false);
     };
     const sharedProps = {
-      student_name: assessment.student_name || result.student_name,
+      student_name: editedStudentName || assessment.student_name || result.student_name,
       session: assessment.session ?? "",
       term: assessment.term || result.term,
       class_name: assessment.class_name || result.class_name,
       initialResult: assessment,
       readOnly: !editing,
-      onEdit: canEdit ? () => setEditing(true) : undefined,
+      onEdit: canEdit ? () => {
+        setEditedStudentName(result.student_name);
+        setEditing(true);
+      } : undefined,
       submitLabel: "Save Changes",
       onSubmit: saveResult,
-      onCancel: () => editing ? setEditing(false) : window.location.assign("/dashboard#results"),
+      onCancel: () => editing ? setEditing(false) : window.location.assign(backToResults),
     };
 
+    const nameEditor = editing ? (
+      <div className="no-print bg-slate-900 px-3 py-3 text-white">
+        <label className="mx-auto flex max-w-[1050px] flex-col gap-1 text-sm font-semibold sm:flex-row sm:items-center">
+          Correct pupil’s name
+          <input
+            autoFocus
+            value={editedStudentName}
+            onChange={(event) => setEditedStudentName(event.target.value)}
+            className="min-h-10 flex-1 rounded-lg border border-slate-500 bg-white px-3 text-slate-900 outline-none focus:border-sky-400"
+          />
+        </label>
+      </div>
+    ) : null;
+
     if (assessment.section === "Nursery") {
-      return <AssessmentTemplate {...sharedProps} section="Nursery" />;
+      return <>{nameEditor}<AssessmentTemplate {...sharedProps} section="Nursery" /></>;
     }
     if (assessment.term === "3rd Term") {
-      return <PrimaryThirdTermTemplate {...sharedProps} priorTermResults={{}} />;
+      return <>{nameEditor}<PrimaryThirdTermTemplate {...sharedProps} priorTermResults={{}} /></>;
     }
-    return <PrimaryAssessmentTemplate {...sharedProps} />;
+    return <>{nameEditor}<PrimaryAssessmentTemplate {...sharedProps} /></>;
   }
 
   return <main className="min-h-screen bg-slate-50 p-4 sm:p-8">
     <div className="mx-auto max-w-3xl">
-      <div className="no-print mb-6 flex items-center justify-between"><Link href="/dashboard#results" className="text-sm text-slate-600">← Back to Result Manager</Link><PrintButton /></div>
+      <div className="no-print mb-6 flex items-center justify-between"><Link href={backToResults} className="text-sm text-slate-600">← Back to Result Manager</Link><PrintButton /></div>
       <section className="rounded border bg-white p-6">
         <h1 className="text-2xl font-bold">{result.student_name}</h1>
         <div className="mt-4 grid grid-cols-2 gap-4 text-sm text-slate-700">

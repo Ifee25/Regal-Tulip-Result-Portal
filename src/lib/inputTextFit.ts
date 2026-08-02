@@ -26,6 +26,10 @@ export function splitTextToInputWidth(value: string, input: HTMLInputElement): [
     }
   }
 
-  const splitAt = Math.max(1, low);
+  let splitAt = Math.max(1, low);
+  // Prefer moving a complete word to the continuation line. Only split inside a
+  // word when that single word is wider than the whole input.
+  const lastWhitespace = value.slice(0, splitAt + 1).search(/\s+\S*$/);
+  if (lastWhitespace > 0) splitAt = lastWhitespace;
   return [value.slice(0, splitAt).trimEnd(), value.slice(splitAt).trimStart()];
 }

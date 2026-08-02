@@ -47,6 +47,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [resultsMessage, setResultsMessage] = useState<string | null>(null);
   const [resultsArmFilter, setResultsArmFilter] = useState("All");
+  const [showArmSummary, setShowArmSummary] = useState(false);
   const [form, setForm] = useState({ student_name: "", session: "2025/2026" });
   const [selectedTerm, setSelectedTerm] = useState(termOptions[0].value);
   const [selectedSection, setSelectedSection] = useState<"Nursery" | "Primary">("Nursery");
@@ -311,6 +312,23 @@ export default function DashboardPage() {
     }
     setEntryStateReady(true);
   }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const timer = window.setTimeout(() => {
+      const requestedArm = new URLSearchParams(window.location.search).get("className");
+      const savedArm = requestedArm ?? window.localStorage.getItem(`regal-tulip-results-arm:${user.id}`);
+      if (savedArm === "All" || (savedArm && allClassOptions.includes(savedArm))) {
+        setResultsArmFilter(savedArm);
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    window.localStorage.setItem(`regal-tulip-results-arm:${user.id}`, resultsArmFilter);
+  }, [user?.id, resultsArmFilter]);
 
   useEffect(() => {
     if (!user?.id || !entryStateReady) return;
@@ -657,6 +675,40 @@ export default function DashboardPage() {
   const filteredResults = isAdmin && resultsArmFilter !== "All"
     ? results.filter((row) => row.class_name === resultsArmFilter)
     : results;
+  const summaryAssessments = filteredResults.map((row) => ({
+    row,
+    assessment: (() => {
+      try {
+        return (typeof row.assessment_data === "string"
+          ? JSON.parse(row.assessment_data)
+          : row.assessment_data) as AssessmentResult | undefined;
+      } catch {
+        return undefined;
+      }
+    })(),
+  }));
+  const summaryColumns = Array.from(new Set(summaryAssessments.flatMap(({ assessment }) =>
+    assessment?.section === "Primary"
+      ? (assessment.primary_subjects ?? []).map((subject) => subject.subject)
+      : (assessment?.assessments ?? []).map((category) => category.name),
+  )));
+
+  function summaryValue(assessment: AssessmentResult | undefined, column: string) {
+    if (!assessment) return "";
+    if (assessment.section === "Primary") {
+      const subject = assessment.primary_subjects?.find((entry) => entry.subject === column);
+      return subject?.not_offered ? "N/A" : subject?.total ?? "";
+    }
+    const category = assessment.assessments?.find((entry) => entry.name === column);
+    const scores = (category?.items ?? [])
+      .filter((item) => !item.not_applicable && item.score !== undefined)
+      .map((item) => Number(item.score));
+    return scores.length ? (scores.reduce((sum, score) => sum + score, 0) / scores.length).toFixed(1) : "";
+  }
+
+  function cacheBatchForPrinting() {
+    window.localStorage.setItem("regal-tulip-print-batch", JSON.stringify(filteredResults));
+  }
   const averageScore = primaryResults.length
     ? Math.round(primaryResults.reduce((sum, row) => sum + getTermAverage(row), 0) / primaryResults.length)
     : 0;
@@ -977,7 +1029,10 @@ export default function DashboardPage() {
                   <span className="mb-1 block text-sm font-semibold text-slate-700">View uploads by class arm</span>
                   <select
                     value={resultsArmFilter}
-                    onChange={(event) => setResultsArmFilter(event.target.value)}
+                    onChange={(event) => {
+                      setResultsArmFilter(event.target.value);
+                      setShowArmSummary(false);
+                    }}
                     className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
                   >
                     <option value="All">All class arms ({results.length})</option>
@@ -992,6 +1047,55 @@ export default function DashboardPage() {
                   Showing {filteredResults.length} upload{filteredResults.length === 1 ? "" : "s"}
                   {resultsArmFilter === "All" ? " across all arms" : ` for ${resultsArmFilter}`}.
                 </p>
+                {resultsArmFilter !== "All" && (
+                  <div className="no-print flex flex-wrap gap-2">
+                    <button type="button" onClick={() => setShowArmSummary((shown) => !shown)} className="rounded-lg border border-sky-700 px-3 py-2 text-sm font-semibold text-sky-800 hover:bg-sky-50">
+                      {showArmSummary ? "Hide summary" : "View spreadsheet summary"}
+                    </button>
+                    <Link
+                      href={`/results/print-all?className=${encodeURIComponent(resultsArmFilter)}`}
+                      onClick={cacheBatchForPrinting}
+                      className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-800"
+                    >
+                      Print all
+                    </Link>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {isAdmin && resultsArmFilter !== "All" && showArmSummary && (
+              <div className="mt-5">
+                <div className="mb-2 flex items-end justify-between gap-3">
+                  <div>
+                    <h4 className="font-semibold">{resultsArmFilter} result summary</h4>
+                    <p className="text-xs text-slate-500">Each row is one pupil’s term result. Nursery columns show the average rating for each learning area.</p>
+                  </div>
+                </div>
+                <div className="max-w-full overflow-x-auto rounded-2xl border border-slate-200">
+                  <table className="min-w-max border-collapse text-xs">
+                    <thead className="bg-slate-100">
+                      <tr>
+                        <th className="sticky left-0 z-10 border border-slate-200 bg-slate-100 px-3 py-2 text-left">Pupil</th>
+                        <th className="border border-slate-200 px-3 py-2 text-left">Term</th>
+                        <th className="border border-slate-200 px-3 py-2 text-left">Session</th>
+                        {summaryColumns.map((column) => <th key={column} className="max-w-36 border border-slate-200 px-3 py-2 text-center">{column}</th>)}
+                        <th className="border border-slate-200 px-3 py-2 text-center">Average</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {summaryAssessments.map(({ row, assessment }) => (
+                        <tr key={row.id} className="odd:bg-white even:bg-slate-50">
+                          <td className="sticky left-0 border border-slate-200 bg-inherit px-3 py-2 font-semibold">{row.student_name}</td>
+                          <td className="border border-slate-200 px-3 py-2">{row.term}</td>
+                          <td className="border border-slate-200 px-3 py-2">{assessment?.session ?? ""}</td>
+                          {summaryColumns.map((column) => <td key={column} className="border border-slate-200 px-3 py-2 text-center">{summaryValue(assessment, column)}</td>)}
+                          <td className="border border-slate-200 px-3 py-2 text-center">{isNurseryResult(row) ? "—" : getTermAverage(row).toFixed(1)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
 
@@ -1055,7 +1159,7 @@ export default function DashboardPage() {
                                   {syncingPendingResults ? "Retrying..." : "Retry Upload"}
                                 </button>
                               )}
-                              <Link href={`/results/${r.id}`} onClick={() => {
+                              <Link href={`/results/${r.id}?className=${encodeURIComponent(resultsArmFilter)}`} onClick={() => {
                                 try {
                                   const prefix = String(r.id).startsWith("local-") ? "regal-tulip-result:" : "regal-tulip-review:";
                                   window.localStorage.setItem(`${prefix}${r.id}`, JSON.stringify(r));
@@ -1063,7 +1167,7 @@ export default function DashboardPage() {
                                   // The review page will retrieve the record from Supabase.
                                 }
                               }} className="rounded border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">View</Link>
-                              <Link href={`/results/${r.id}?edit=1`} onClick={() => {
+                              <Link href={`/results/${r.id}?edit=1&className=${encodeURIComponent(resultsArmFilter)}`} onClick={() => {
                                 try {
                                   const prefix = String(r.id).startsWith("local-") ? "regal-tulip-result:" : "regal-tulip-review:";
                                   window.localStorage.setItem(`${prefix}${r.id}`, JSON.stringify(r));
