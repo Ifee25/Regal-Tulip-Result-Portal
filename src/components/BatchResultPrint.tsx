@@ -71,7 +71,7 @@ export default function BatchResultPrint({ className }: { className: string }) {
           onCancel: () => {},
         };
         return (
-          <section key={row.id} className={`batch-result ${assessment.section === "Nursery" ? "batch-nursery-result" : "batch-primary-result"}`}>
+          <section key={row.id} className="batch-result">
             {assessment.section === "Nursery"
               ? <AssessmentTemplate {...common} section="Nursery" />
               : assessment.term === "3rd Term"
@@ -83,29 +83,11 @@ export default function BatchResultPrint({ className }: { className: string }) {
 
       <style jsx global>{`
         @media print {
-          /*
-           * A single Primary result uses a fixed-height, overflow-hidden form.
-           * During batch pagination Chromium clips every fragmented form except
-           * the last one. Let the scaled sheet remain visible and paginate the
-           * complete Primary page itself instead of fragmenting its wrapper.
-           */
-          .batch-primary-result .primary-entry-page,
-          .batch-primary-result .primary-entry-page form {
-            overflow: visible !important;
-          }
-          .batch-primary-result .primary-entry-page {
+          .batch-result {
             break-after: page;
             page-break-after: always;
           }
-          .batch-primary-result:last-child .primary-entry-page {
-            break-after: auto;
-            page-break-after: auto;
-          }
-          .batch-nursery-result {
-            break-after: page;
-            page-break-after: always;
-          }
-          .batch-nursery-result:last-child {
+          .batch-result:last-child {
             break-after: auto;
             page-break-after: auto;
           }
