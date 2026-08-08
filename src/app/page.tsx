@@ -23,7 +23,7 @@ export default function Home() {
                 <span className="h-2 w-2 rounded-full bg-amber-500" />Regal Tulip School · Nkwelle
               </div>
               <h1 className="mt-7 text-4xl font-black leading-[1.08] tracking-[-0.035em] text-blue-950 sm:text-5xl lg:text-6xl">
-                Every child’s progress,<span className="block text-sky-600">presented with purpose.</span>
+                Every Child&apos;s progress<span className="block text-sky-600">keenly observed and documented.</span>
               </h1>
               <p className="mt-6 max-w-2xl text-base leading-8 text-slate-600 sm:text-lg">A secure and dependable result portal created to help our school community manage, review and access pupil reports with confidence.</p>
               <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -50,7 +50,7 @@ export default function Home() {
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="max-w-2xl">
               <p className="text-xs font-bold uppercase tracking-[0.28em] text-sky-600">Designed for our school community</p>
-              <h2 className="mt-3 text-3xl font-black tracking-tight text-blue-950 sm:text-4xl">Simple to use. Serious about every record.</h2>
+              <h2 className="mt-3 text-3xl font-black tracking-tight text-blue-950 sm:text-4xl">Simple to use.</h2>
             </div>
             <div className="mt-10 grid gap-5 md:grid-cols-3">
               {highlights.map((item) => (
