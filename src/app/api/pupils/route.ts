@@ -8,6 +8,7 @@ export async function GET(req:Request){
  const {data:{user},error}=await supabase.auth.getUser(token);
  const className=new URL(req.url).searchParams.get("class")??"";
  if(error || !user || (!isPortalAdmin(user.email) && !getStaffClasses(user.email).includes(className))) return Response.json({error:"Class access denied."},{status:403});
+ if (!process.env.REGISTRATION_SUPABASE_URL || !process.env.REGISTRATION_SUPABASE_SECRET_KEY) return Response.json({error:"Pupil lookup is not configured on this server. Ask the administrator to add the registration database URL and secret key to the hosting environment, then redeploy."},{status:503});
  try {
  const db=registrationClient();
  const {data:classes,error:ce}=await db.from("classes").select("id").eq("name",className.replace(/([0-9])[RST]$/, "$1")); if(ce) throw ce;

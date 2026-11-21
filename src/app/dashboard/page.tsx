@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { findSelectedPupil } from "@/lib/pupilSelection";
 import { getBrowserSupabase } from "@/lib/supabaseClient";
 import { clearAdminSession } from "@/lib/adminAuth";
 import AssessmentTemplate from "@/components/AssessmentTemplate";
@@ -52,22 +53,33 @@ export default function DashboardPage() {
   const [selectedTerm, setSelectedTerm] = useState(termOptions[0].value);
   const [selectedSection, setSelectedSection] = useState<"Nursery" | "Primary">("Nursery");
   const [selectedClassName, setSelectedClassName] = useState(nurseryClassOptions[0]);
-  const [registeredPupils,setRegisteredPupils]=useState<{id:string;name:string;reg_no:string}[]>([]);
-  const [pupilError,setPupilError]=useState("");
-  const [selectedPupilId,setSelectedPupilId]=useState("");
-  const pupilMatches=registeredPupils.filter(p=>p.name.toLowerCase()===form.student_name.trim().toLowerCase());
-  const selectedPupil=pupilMatches.find(p=>p.id===selectedPupilId) ?? (pupilMatches.length===1?pupilMatches[0]:undefined);
-  useEffect(()=>{
-    let cancelled=false;setRegisteredPupils([]);setPupilError("");
-    if(!supabase || !user) return;
-    void(async()=>{try{
-      const {data}=await supabase.auth.getSession();
-      const response=await fetch('/api/pupils?class='+encodeURIComponent(selectedClassName),{headers:{Authorization:'Bearer '+data.session?.access_token}});
-      const body=await response.json();
-      if(!cancelled){setRegisteredPupils(body.pupils??[]);setPupilError(body.error??"");}
-    }catch{if(!cancelled)setPupilError("Unable to load registered pupils.");}})();
-    return()=>{cancelled=true;};
-  },[supabase,user,selectedClassName]);
+  const [pupilLookup, setPupilLookup] = useState<{className: string; pupils: {id: string; name: string; reg_no: string}[]; error: string} | null>(null);
+  const [pupilRetry, setPupilRetry] = useState(0);
+  const [selectedPupilId, setSelectedPupilId] = useState("");
+  const [pupilSearchOpen, setPupilSearchOpen] = useState(false);
+  const [entryError, setEntryError] = useState("");
+  const pupilLoading = !pupilLookup || pupilLookup.className !== selectedClassName;
+  const registeredPupils = pupilLoading ? [] : pupilLookup.pupils;
+  const pupilError = pupilLoading ? "" : pupilLookup.error;
+  const selectedPupil = findSelectedPupil(registeredPupils, form.student_name, selectedPupilId);
+  const searchWords = form.student_name.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const pupilSuggestions = registeredPupils.filter(p => searchWords.every(word => (p.name + " " + p.reg_no).toLowerCase().includes(word)));
+  useEffect(() => {
+    let cancelled = false;
+    if (!supabase || !user) return;
+    void (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const response = await fetch('/api/pupils?class=' + encodeURIComponent(selectedClassName), { cache: "no-store", headers: { Authorization: 'Bearer ' + data.session?.access_token } });
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error || "Unable to load registered pupils.");
+        if (!cancelled) setPupilLookup({className: selectedClassName, pupils: body.pupils ?? [], error: ""});
+      } catch (error) {
+        if (!cancelled) setPupilLookup({className: selectedClassName, pupils: [], error: error instanceof Error ? error.message : "Unable to load registered pupils."});
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [supabase, user, selectedClassName, pupilRetry]);
   const [staffAccessEnabled, setStaffAccessEnabled] = useState(false);
   const [accessMessage, setAccessMessage] = useState("Loading staff access...");
   const [staffEmails, setStaffEmails] = useState<string[]>([]);
@@ -496,11 +508,14 @@ export default function DashboardPage() {
     }
 
     if (!form.student_name.trim()) {
-      setAccessMessage("Please enter the student's name.");
+      setEntryError("Type a pupil name or Reg No, then select the registered pupil below.");
+      setPupilSearchOpen(true);
       return;
     }
 
-    if(!selectedPupil){setAccessMessage("Select a registered pupil before opening the result sheet.");return;}
+    if (!selectedPupil?.reg_no) { setEntryError(pupilError || "Choose a registered pupil from the suggestions to fill their Reg No."); setPupilSearchOpen(true); return; }
+    setEntryError("");
+    setForm(current => ({...current, student_name: selectedPupil.name}));
     if (selectedSection === "Primary" && selectedTerm === "3rd Term") {
       let matchingRows = results.filter((row) =>
         row.student_name?.trim().toLowerCase() === form.student_name.trim().toLowerCase() &&
@@ -978,29 +993,47 @@ export default function DashboardPage() {
             </div>
 
             {(isAdmin || isAuthorizedUploader) ? (
-              <form onSubmit={handleCreateClick} className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(160px,1.4fr)_minmax(105px,1fr)_minmax(105px,1fr)_minmax(120px,1fr)_minmax(130px,1fr)_auto]">
-                <input className="rounded-2xl border border-slate-200 px-3 py-2 outline-none ring-0 focus:border-sky-500" list="registered-pupils" placeholder="Student name" value={form.student_name} onChange={(e) => setForm({ ...form, student_name: e.target.value })} /><p className="text-sm text-slate-500">Registered pupils are listed by year group. Select a pupil assigned to your class arm.</p><datalist id="registered-pupils">{registeredPupils.map(p=><option key={p.id} value={p.name}>{p.reg_no}</option>)}</datalist>
-                {pupilMatches.length>1 && <select aria-label="Choose pupil Reg No" value={selectedPupilId} onChange={e=>setSelectedPupilId(e.target.value)}><option value="">Choose Reg No</option>{pupilMatches.map(p=><option key={p.id} value={p.id}>{p.name} / {p.reg_no}</option>)}</select>}
-                <label>Reg No<input className="rounded-2xl border border-slate-200 p-2" readOnly value={selectedPupil?.reg_no??""}/></label>
-                {pupilError && <p role="alert">{pupilError}</p>}
-                <select className="rounded-2xl border border-slate-200 bg-white px-3 py-2 outline-none focus:border-sky-500" value={selectedTerm} onChange={(e) => setSelectedTerm(e.target.value)}>
-                  {termOptions.map((term) => (
-                    <option key={term.value} value={term.value}>{term.label}</option>
-                  ))}
-                </select>
-                <select disabled={!isAdmin} className="rounded-2xl border border-slate-200 bg-white px-3 py-2 outline-none focus:border-sky-500 disabled:opacity-100" value={selectedSection} onChange={(e) => setSelectedSection(e.target.value as "Nursery" | "Primary")}>
-                  {(isAdmin || assignedClass?.startsWith("Nursery")) && <option value="Nursery">Nursery</option>}
-                  {(isAdmin || assignedClass?.startsWith("Primary")) && <option value="Primary">Primary</option>}
-                </select>
-                <select disabled={!isAdmin} className="rounded-2xl border border-slate-200 bg-white px-3 py-2 outline-none focus:border-sky-500 disabled:opacity-100" value={selectedClassName} onChange={(e) => setSelectedClassName(e.target.value)}>
-                  {(isAdmin ? (selectedSection === "Nursery" ? nurseryClassOptions : primaryClassOptions) : assignedClasses).map((className) => (
-                    <option key={className} value={className}>{className}</option>
-                  ))}
-                </select>
-                <select aria-label="Academic session" className="w-full min-w-0 rounded-2xl border border-slate-200 bg-white px-3 py-2 outline-none focus:border-sky-500" value={form.session} onChange={(e) => setForm({ ...form, session: e.target.value })}>
-                  {sessionOptions.map((session) => <option key={session} value={session}>{session}</option>)}
-                </select>
-                <button className="w-full rounded-2xl bg-sky-600 px-5 py-2 font-semibold text-white hover:bg-sky-700 xl:w-auto">Add</button>
+              <form onSubmit={handleCreateClick} className="mt-6 space-y-5">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  <label className="min-w-0 space-y-2 text-sm font-semibold">Section
+                    <select disabled={!isAdmin} className="min-h-12 w-full min-w-0 rounded-xl border border-slate-300 bg-white px-3 py-3 text-base text-slate-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100 disabled:bg-slate-50 disabled:text-slate-700" value={selectedSection} onChange={e => { setSelectedSection(e.target.value as "Nursery" | "Primary"); setSelectedPupilId(""); setEntryError(""); }}>
+                      {(isAdmin || assignedClass?.startsWith("Nursery")) && <option value="Nursery">Nursery</option>}
+                      {(isAdmin || assignedClass?.startsWith("Primary")) && <option value="Primary">Primary</option>}
+                    </select>
+                  </label>
+                  <label className="min-w-0 space-y-2 text-sm font-semibold">Class
+                    <select disabled={!isAdmin} className="min-h-12 w-full min-w-0 rounded-xl border border-slate-300 bg-white px-3 py-3 text-base text-slate-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100 disabled:bg-slate-50 disabled:text-slate-700" value={selectedClassName} onChange={e => { setSelectedClassName(e.target.value); setSelectedPupilId(""); setEntryError(""); }}>
+                      {(isAdmin ? (selectedSection === "Nursery" ? nurseryClassOptions : primaryClassOptions) : assignedClasses).map(name => <option key={name} value={name}>{name}</option>)}
+                    </select>
+                  </label>
+                  <label className="min-w-0 space-y-2 text-sm font-semibold">Term
+                    <select className="min-h-12 w-full min-w-0 rounded-xl border border-slate-300 bg-white px-3 py-3 text-base text-slate-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100 disabled:bg-slate-50 disabled:text-slate-700" value={selectedTerm} onChange={e => setSelectedTerm(e.target.value)}>{termOptions.map(term => <option key={term.value} value={term.value}>{term.label}</option>)}</select>
+                  </label>
+                  <label className="min-w-0 space-y-2 text-sm font-semibold">Academic session
+                    <select className="min-h-12 w-full min-w-0 rounded-xl border border-slate-300 bg-white px-3 py-3 text-base text-slate-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100 disabled:bg-slate-50 disabled:text-slate-700" value={form.session} onChange={e => setForm({...form, session: e.target.value})}>{sessionOptions.map(session => <option key={session} value={session}>{session}</option>)}</select>
+                  </label>
+                </div>
+                <div className="grid grid-cols-1 items-start gap-4 border-t border-slate-100 pt-5 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+                  <div className="min-w-0">
+                    <label htmlFor="result-pupil-search" className="mb-2 block text-sm font-semibold">Pupil name or Reg No</label>
+                    <input id="result-pupil-search" autoComplete="off" className="min-h-12 w-full min-w-0 rounded-xl border border-slate-300 bg-white px-3 py-3 text-base text-slate-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100 disabled:bg-slate-50 disabled:text-slate-700" placeholder={pupilLoading ? "Loading registered pupils..." : "Type a name or registration number"} value={form.student_name} onFocus={() => setPupilSearchOpen(true)} onChange={e => { setForm({...form, student_name: e.target.value}); setSelectedPupilId(""); setPupilSearchOpen(true); setEntryError(""); }} aria-describedby="pupil-selection-help" aria-controls="pupil-suggestions" aria-expanded={pupilSearchOpen && !pupilLoading && !pupilError} />
+                    <p id="pupil-selection-help" className="mt-2 text-sm text-slate-500">Select a pupil below to fill their Reg No. Pupils are listed by year group; choose a pupil in your class arm.</p>
+                    {pupilSearchOpen && !pupilLoading && !pupilError && <div id="pupil-suggestions" className="mt-3 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white" aria-label="Matching registered pupils">
+                      {pupilSuggestions.length ? pupilSuggestions.map(p => <button key={p.id} type="button" onClick={() => { setForm({...form, student_name:p.name}); setSelectedPupilId(p.id); setPupilSearchOpen(false); setEntryError(""); }} className="flex min-h-12 w-full flex-col gap-1 border-b border-slate-100 px-4 py-3 text-left last:border-0 hover:bg-sky-50 focus:bg-sky-50 sm:flex-row sm:items-center sm:justify-between"><span className="min-w-0 break-words font-medium">{p.name}</span><span className="break-all text-sm text-sky-700">{p.reg_no || "Reg No missing"}</span></button>) : <p className="p-4 text-sm text-slate-600">{registeredPupils.length ? "No matching pupil. Try a first name, surname, or Reg No." : "No active registered pupils were found for this year group."}</p>}
+                    </div>}
+                  </div>
+                  <label className="min-w-0 space-y-2 text-sm font-semibold">Reg No
+                    <input className="min-h-12 w-full min-w-0 rounded-xl border border-slate-300 bg-white px-3 py-3 text-base text-slate-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100 disabled:bg-slate-50 disabled:text-slate-700 bg-slate-50" readOnly value={selectedPupil?.reg_no ?? ""} placeholder="Filled when a pupil is selected" />
+                    {selectedPupil && <span className="block text-sm font-normal text-emerald-700" role="status">{selectedPupil.reg_no ? "Registered pupil selected." : "This pupil has no registered admission number. Contact the school office."}</span>}
+                  </label>
+                </div>
+                {pupilLoading && <p role="status" className="text-sm text-slate-600">Loading registered pupils...</p>}
+                {pupilError && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"><p>{pupilError}</p><button type="button" onClick={() => {setPupilLookup(null); setPupilRetry(value => value + 1);}} className="mt-2 min-h-11 font-semibold underline">Retry loading pupils</button></div>}
+                {entryError && <p role="alert" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{entryError}</p>}
+                <div className="flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-slate-500">Open the result sheet to enter this pupil&apos;s assessment.</p>
+                  <button type="submit" disabled={pupilLoading || Boolean(pupilError)} className="min-h-12 w-full shrink-0 rounded-xl bg-sky-600 px-6 py-3 font-semibold text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">Add result</button>
+                </div>
               </form>
             ) : (
               <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
