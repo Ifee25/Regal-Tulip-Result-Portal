@@ -6,7 +6,7 @@ import { AssessmentCategory, AssessmentResult, NURSERY_ASSESSMENTS } from "@/typ
 import { splitTextToInputWidth } from "@/lib/inputTextFit";
 
 interface Props {
-  student_name: string;
+  reg_no?: string; pupil_id?: string; student_name: string;
   session: string;
   term: string;
   class_name: string;
@@ -31,7 +31,7 @@ type Info = {
 
 const pageOne = new Set(["NUMERACY", "VERBAL DEVELOPMENT", "WRITING"]);
 
-export default function AssessmentTemplate({ student_name, session, term, class_name, section, onSubmit, onCancel, initialResult, readOnly = false, draftKey, onEdit, submitLabel = "Submit Result" }: Props) {
+export default function AssessmentTemplate({ reg_no, pupil_id, student_name, session, term, class_name, section, onSubmit, onCancel, initialResult, readOnly = false, draftKey, onEdit, submitLabel = "Submit Result" }: Props) {
   const [assessments, setAssessments] = useState<AssessmentCategory[]>(
     (initialResult?.assessments?.length ? initialResult.assessments : NURSERY_ASSESSMENTS).map((category) => ({
       ...category,
@@ -196,7 +196,7 @@ export default function AssessmentTemplate({ student_name, session, term, class_
     setMessage(null);
     try {
       await onSubmit({
-        student_name, term, class_name, section, nursery_class: class_name, assessments,
+        student_name, reg_no: reg_no ?? initialResult?.reg_no, pupil_id: pupil_id ?? initialResult?.pupil_id, term, class_name, section, nursery_class: class_name, assessments,
         session: info.session, age: info.age, height_start: info.heightStart,
         height_end: info.heightEnd, weight_start: info.weightStart, weight_end: info.weightEnd,
         days_school_opened: Number(info.daysOpened), days_absent: Number(info.daysAbsent),
@@ -244,7 +244,7 @@ export default function AssessmentTemplate({ student_name, session, term, class_
             <div className="paired"><b>HEIGHT:</b><label>H1 (cm):<input value={info.heightStart} onChange={(e) => updateInfo("heightStart", e.target.value)} /></label><label>H2 (cm):<input value={info.heightEnd} onChange={(e) => updateInfo("heightEnd", e.target.value)} /></label></div>
           </div>
           <div className="header-lines second-header-line">
-            <label className="name-field">NAME:<input value={student_name} disabled /></label>
+            <label>REG NO: {reg_no ?? initialResult?.reg_no ?? ""}</label><label className="name-field">NAME:<input value={student_name} disabled /></label>
             <label>NURSERY:<input value={class_name} disabled /></label>
             <label>AGE:<input value={info.age} onChange={(e) => updateInfo("age", e.target.value)} /></label>
             <div className="paired"><b>WEIGHT</b><label>W1 (kg):<input value={info.weightStart} onChange={(e) => updateInfo("weightStart", e.target.value)} /></label><label>W2 (kg):<input value={info.weightEnd} onChange={(e) => updateInfo("weightEnd", e.target.value)} /></label></div>

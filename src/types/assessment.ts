@@ -11,6 +11,8 @@ export type AssessmentItem = {
 };
 
 export type AssessmentResult = {
+  pupil_id?: string;
+  reg_no?: string;
   student_name: string;
   term: string;
   class_name: string;

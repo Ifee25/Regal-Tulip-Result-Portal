@@ -14,7 +14,7 @@ import { getPrimaryRemark } from "@/lib/primaryRemark";
 import { splitTextToInputWidth } from "@/lib/inputTextFit";
 
 type Props = {
-  student_name: string;
+  reg_no?: string; pupil_id?: string; student_name: string;
   session: string;
   term: string;
   class_name: string;
@@ -32,7 +32,7 @@ const emptySubjects = (): PrimarySubjectResult[] =>
 const emptyRatings = (labels: readonly string[]): PrimaryRating[] =>
   labels.map((label) => ({ label }));
 
-export default function PrimaryAssessmentTemplate({ student_name, session, term, class_name, onSubmit, onCancel, initialResult, readOnly = false, draftKey, onEdit, submitLabel = "Submit Result" }: Props) {
+export default function PrimaryAssessmentTemplate({ reg_no, pupil_id, student_name, session, term, class_name, onSubmit, onCancel, initialResult, readOnly = false, draftKey, onEdit, submitLabel = "Submit Result" }: Props) {
   const [subjects, setSubjects] = useState(() => initialResult?.primary_subjects?.length ? initialResult.primary_subjects : emptySubjects());
   const [scoreDrafts, setScoreDrafts] = useState<Record<string, string>>({});
   const [affectiveTraits, setAffectiveTraits] = useState(() => initialResult?.affective_traits?.length ? initialResult.affective_traits : emptyRatings(PRIMARY_AFFECTIVE_TRAITS));
@@ -177,7 +177,7 @@ export default function PrimaryAssessmentTemplate({ student_name, session, term,
     setMessage(null);
     try {
       await onSubmit({
-        student_name, term, class_name, section: "Primary", assessments: [],
+        student_name, reg_no: reg_no ?? initialResult?.reg_no, pupil_id: pupil_id ?? initialResult?.pupil_id, term, class_name, section: "Primary", assessments: [],
         session: info.session, age: info.age, average_age: info.averageAge,
         number_in_class: info.numberInClass, position: info.position,
         weight_start: info.weightStart, weight_end: info.weightEnd,
@@ -221,7 +221,7 @@ export default function PrimaryAssessmentTemplate({ student_name, session, term,
             </header>
 
             <div className="mt-5 grid grid-cols-[2.1fr_1fr_.9fr_1.25fr_1fr_1.2fr] gap-2">
-              <label className="flex"><b>NAME:</b><span className="flex-1 border-b border-dotted border-black px-1">{student_name}</span></label>
+              <label className="flex"><b>NAME:</b><span className="flex-1 border-b border-dotted border-black px-1">{student_name}</span><span className="ml-3 whitespace-nowrap">REG NO: {reg_no ?? initialResult?.reg_no ?? ""}</span></label>
               <label className="flex"><b>CLASS:</b><span className="flex-1 border-b border-dotted border-black px-1">{class_name}</span></label>
               {lineInput("age", "AGE:")}{lineInput("averageAge", "AVERAGE AGE:")}
               <label className="flex"><b>TERM:</b><span className="flex-1 border-b border-dotted border-black px-1">{term}</span></label>

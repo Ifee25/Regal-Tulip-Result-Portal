@@ -52,6 +52,22 @@ export default function DashboardPage() {
   const [selectedTerm, setSelectedTerm] = useState(termOptions[0].value);
   const [selectedSection, setSelectedSection] = useState<"Nursery" | "Primary">("Nursery");
   const [selectedClassName, setSelectedClassName] = useState(nurseryClassOptions[0]);
+  const [registeredPupils,setRegisteredPupils]=useState<{id:string;name:string;reg_no:string}[]>([]);
+  const [pupilError,setPupilError]=useState("");
+  const [selectedPupilId,setSelectedPupilId]=useState("");
+  const pupilMatches=registeredPupils.filter(p=>p.name.toLowerCase()===form.student_name.trim().toLowerCase());
+  const selectedPupil=pupilMatches.find(p=>p.id===selectedPupilId) ?? (pupilMatches.length===1?pupilMatches[0]:undefined);
+  useEffect(()=>{
+    let cancelled=false;setRegisteredPupils([]);setPupilError("");
+    if(!supabase || !user) return;
+    void(async()=>{try{
+      const {data}=await supabase.auth.getSession();
+      const response=await fetch('/api/pupils?class='+encodeURIComponent(selectedClassName),{headers:{Authorization:'Bearer '+data.session?.access_token}});
+      const body=await response.json();
+      if(!cancelled){setRegisteredPupils(body.pupils??[]);setPupilError(body.error??"");}
+    }catch{if(!cancelled)setPupilError("Unable to load registered pupils.");}})();
+    return()=>{cancelled=true;};
+  },[supabase,user,selectedClassName]);
   const [staffAccessEnabled, setStaffAccessEnabled] = useState(false);
   const [accessMessage, setAccessMessage] = useState("Loading staff access...");
   const [staffEmails, setStaffEmails] = useState<string[]>([]);
@@ -484,6 +500,7 @@ export default function DashboardPage() {
       return;
     }
 
+    if(!selectedPupil){setAccessMessage("Select a registered pupil before opening the result sheet.");return;}
     if (selectedSection === "Primary" && selectedTerm === "3rd Term") {
       let matchingRows = results.filter((row) =>
         row.student_name?.trim().toLowerCase() === form.student_name.trim().toLowerCase() &&
@@ -492,7 +509,7 @@ export default function DashboardPage() {
         (() => {
           try {
             const assessment = typeof row.assessment_data === "string" ? JSON.parse(row.assessment_data) : row.assessment_data;
-            return assessment?.session === form.session;
+            return assessment?.session === form.session && assessment?.pupil_id === selectedPupil.id;
           } catch {
             return false;
           }
@@ -503,7 +520,7 @@ export default function DashboardPage() {
         const { data, error } = await supabase
           .from("students")
           .select("student_name, class_name, term, assessment_data, created_at")
-          .ilike("student_name", form.student_name.trim())
+          .eq("assessment_data->>pupil_id", selectedPupil.id)
           .eq("class_name", selectedClassName)
           .eq("assessment_data->>session", form.session)
           .in("term", ["1st Term", "2nd Term"])
@@ -534,6 +551,7 @@ export default function DashboardPage() {
       setPriorPrimaryResults({});
     }
 
+    if(!selectedPupil){setAccessMessage("Select a registered pupil before opening the result sheet.");return;}
     setShowAssessmentTemplate(true);
   }
 
@@ -546,6 +564,8 @@ export default function DashboardPage() {
       return;
     }
 
+    if(!selectedPupil){throw new Error("Select a registered pupil.");}
+    result={...result,pupil_id:selectedPupil.id,reg_no:selectedPupil.reg_no};
     // Nursery reports use developmental ratings, not academic averages.
     const averageScore = result.section === "Primary"
       ? (() => {
@@ -835,7 +855,7 @@ export default function DashboardPage() {
       if (selectedTerm === "3rd Term") {
         return (
           <PrimaryThirdTermTemplate
-            student_name={form.student_name}
+            reg_no={selectedPupil?.reg_no} pupil_id={selectedPupil?.id} student_name={form.student_name}
             session={form.session}
             term={selectedTerm}
             class_name={selectedClassName}
@@ -852,7 +872,7 @@ export default function DashboardPage() {
       }
       return (
         <PrimaryAssessmentTemplate
-          student_name={form.student_name}
+          reg_no={selectedPupil?.reg_no} pupil_id={selectedPupil?.id} student_name={form.student_name}
           session={form.session}
           term={selectedTerm}
           class_name={selectedClassName}
@@ -868,7 +888,7 @@ export default function DashboardPage() {
     }
     return (
       <AssessmentTemplate
-        student_name={form.student_name}
+        reg_no={selectedPupil?.reg_no} pupil_id={selectedPupil?.id} student_name={form.student_name}
         session={form.session}
         term={selectedTerm}
         class_name={selectedClassName}
@@ -959,7 +979,10 @@ export default function DashboardPage() {
 
             {(isAdmin || isAuthorizedUploader) ? (
               <form onSubmit={handleCreateClick} className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(160px,1.4fr)_minmax(105px,1fr)_minmax(105px,1fr)_minmax(120px,1fr)_minmax(130px,1fr)_auto]">
-                <input className="rounded-2xl border border-slate-200 px-3 py-2 outline-none ring-0 focus:border-sky-500" placeholder="Student name" value={form.student_name} onChange={(e) => setForm({ ...form, student_name: e.target.value })} />
+                <input className="rounded-2xl border border-slate-200 px-3 py-2 outline-none ring-0 focus:border-sky-500" list="registered-pupils" placeholder="Student name" value={form.student_name} onChange={(e) => setForm({ ...form, student_name: e.target.value })} /><p className="text-sm text-slate-500">Registered pupils are listed by year group. Select a pupil assigned to your class arm.</p><datalist id="registered-pupils">{registeredPupils.map(p=><option key={p.id} value={p.name}>{p.reg_no}</option>)}</datalist>
+                {pupilMatches.length>1 && <select aria-label="Choose pupil Reg No" value={selectedPupilId} onChange={e=>setSelectedPupilId(e.target.value)}><option value="">Choose Reg No</option>{pupilMatches.map(p=><option key={p.id} value={p.id}>{p.name} / {p.reg_no}</option>)}</select>}
+                <label>Reg No<input className="rounded-2xl border border-slate-200 p-2" readOnly value={selectedPupil?.reg_no??""}/></label>
+                {pupilError && <p role="alert">{pupilError}</p>}
                 <select className="rounded-2xl border border-slate-200 bg-white px-3 py-2 outline-none focus:border-sky-500" value={selectedTerm} onChange={(e) => setSelectedTerm(e.target.value)}>
                   {termOptions.map((term) => (
                     <option key={term.value} value={term.value}>{term.label}</option>
