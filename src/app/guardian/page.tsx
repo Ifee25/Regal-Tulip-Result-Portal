@@ -1,5 +1,5 @@
 "use client";
-import Link from "next/link";
+import GuardianDashboard from "@/components/GuardianDashboard";
 import GuardianLogin from "@/components/GuardianLogin";
 import {useEffect,useState} from "react";
 import AssessmentTemplate from "@/components/AssessmentTemplate";
@@ -7,7 +7,7 @@ import PrimaryAssessmentTemplate from "@/components/PrimaryAssessmentTemplate";
 import PrimaryThirdTermTemplate from "@/components/PrimaryThirdTermTemplate";
 import type {AssessmentResult} from "@/types/assessment";
 type Report={id:string;class_name:string;term:string;average_score:number;assessment_data:AssessmentResult|string|null};
-type Account={pupil:{id:string;name:string;reg_no:string};results:Report[]};
+type Account={pupil:{id:string;name:string;last_name:string;reg_no:string};results:Report[]};
 export default function GuardianPage(){
  const [account,setAccount]=useState<Account|null>(null),[phone,setPhone]=useState(""),[reg,setReg]=useState(""),[message,setMessage]=useState(""),[busy,setBusy]=useState(true),[selected,setSelected]=useState<Report|null>(null);
  async function load(){const response=await fetch("/api/guardian",{cache:"no-store"});const body=await response.json();if(!response.ok)throw new Error(body.error);setAccount(body);}
@@ -17,7 +17,5 @@ export default function GuardianPage(){
  if(account && selected){let assessment:AssessmentResult|null=null;try{assessment=typeof selected.assessment_data==="string"?JSON.parse(selected.assessment_data):selected.assessment_data;}catch{}
  if(assessment){const props={student_name:account.pupil.name,reg_no:account.pupil.reg_no,session:assessment.session??"",term:selected.term,class_name:selected.class_name,initialResult:assessment,readOnly:true,onSubmit:async()=>{},onCancel:()=>setSelected(null)};if(assessment.section==="Nursery")return <AssessmentTemplate {...props} section="Nursery"/>;if(selected.term==="3rd Term")return <PrimaryThirdTermTemplate {...props} priorTermResults={{}}/>;return <PrimaryAssessmentTemplate {...props}/>;}}
  if (!account) return <GuardianLogin phone={phone} reg={reg} busy={busy} message={message} onPhoneChange={setPhone} onRegChange={setReg} onSubmit={login} />;
- return <main className="min-h-screen bg-slate-50 px-4 py-12"><div className="mx-auto max-w-3xl rounded-3xl bg-white p-6 shadow-sm sm:p-10"><p className="text-sm font-semibold uppercase tracking-widest text-sky-600">Parent / Guardian portal</p><h1 className="mt-3 text-3xl font-bold text-slate-900">{account?account.pupil.name:"View results for your child"}</h1>
- {account?<><p className="mt-3 text-slate-600">Reg No: {account.pupil.reg_no}</p><button disabled={busy} onClick={logout} className="my-4 rounded-xl border px-4 py-2">Sign out</button><h2 className="text-xl font-semibold">Uploaded results</h2>{account.results.length===0?<p className="mt-4 text-slate-600">No results have been uploaded for your child yet.</p>:<div className="mt-4 space-y-3">{account.results.map(r=><div key={r.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4"><div><p className="font-semibold">{r.class_name} / {r.term}</p>{!r.class_name.startsWith("Nursery")&&<p>Average: {r.average_score}%</p>}</div>{r.assessment_data&&<button onClick={()=>setSelected(r)} className="rounded-xl bg-sky-600 px-4 py-2 text-white">View / print result</button>}</div>)}</div>}</>:<form onSubmit={login} className="mt-6 space-y-4"><p className="text-slate-600">Use the Guardian Number and Reg No recorded during your child?s registration.</p><label className="block">Guardian Number<input type="tel" autoComplete="tel" required value={phone} onChange={e=>setPhone(e.target.value)} className="mt-1 block w-full rounded-xl border p-3"/></label><label className="block">Child Reg No<input required autoComplete="username" value={reg} onChange={e=>setReg(e.target.value)} className="mt-1 block w-full rounded-xl border p-3"/></label><button disabled={busy} className="w-full rounded-xl bg-sky-600 p-3 font-semibold text-white disabled:opacity-50">{busy?"Please wait...":"Sign in"}</button></form>}
- {message&&<p role="alert" className="mt-4 text-red-700">{message}</p>}<Link href="/" className="mt-6 inline-block text-sky-700">Back home</Link></div></main>;
+ return <GuardianDashboard account={account} busy={busy} message={message} onSignOut={logout} onSelectResult={setSelected} />;
 }

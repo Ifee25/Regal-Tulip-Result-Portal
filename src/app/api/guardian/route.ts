@@ -33,7 +33,7 @@ export async function GET(req:NextRequest){
  const url=process.env.NEXT_PUBLIC_SUPABASE_URL,key=process.env.SUPABASE_SECRET_KEY||process.env.SUPABASE_SERVICE_ROLE_KEY;if(!url||!key)throw new Error();
  const db=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
  const {data:results,error:re}=await db.from("students").select("id,student_name,class_name,term,average_score,assessment_data,created_at").eq("assessment_data->>pupil_id",id).order("created_at",{ascending:false});if(re)throw re;
- return NextResponse.json({pupil:{id,name:[pupil.first_name,pupil.last_name].filter(Boolean).join(" "),reg_no:pupil.admission_number},results},{headers:privateHeaders});
+ return NextResponse.json({pupil:{id,last_name:pupil.last_name,name:[pupil.first_name,pupil.last_name].filter(Boolean).join(" "),reg_no:pupil.admission_number},results},{headers:privateHeaders});
  }catch{return NextResponse.json({error:"Unable to load results. Please try again."},{status:503,headers:privateHeaders});}
 }
 export async function DELETE(){const response=NextResponse.json({success:true},{headers:privateHeaders});response.cookies.set(cookie,"",{httpOnly:true,path:"/api/guardian",maxAge:0});return response;}
