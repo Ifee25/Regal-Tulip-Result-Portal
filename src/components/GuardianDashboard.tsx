@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import GuardianResultTable from "@/components/GuardianResultTable";
 import { useState } from "react";
 import type { AssessmentResult } from "@/types/assessment";
 
@@ -23,6 +24,7 @@ function ResultIcon() {
 
 export default function GuardianDashboard({ account, busy, message, onSignOut, onSelectResult }: Props) {
   const [menu, setMenu] = useState<"profile" | "result">("result");
+  const [showResultTable, setShowResultTable] = useState(false);
   const guardianName = account.pupil.last_name?.trim() ? `Mr/Mrs ${account.pupil.last_name.trim()}` : "Parent/Guardian";
   const currentClass = account.results[0]?.class_name;
 
@@ -42,7 +44,7 @@ export default function GuardianDashboard({ account, busy, message, onSignOut, o
           <p className="mb-3 hidden px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400 md:block">Main</p>
           <div className="grid grid-cols-2 gap-2 md:grid-cols-1">
             <button type="button" onClick={() => setMenu("profile")} aria-current={menu === "profile" ? "page" : undefined} className={`flex min-h-12 items-center gap-3 rounded-lg px-4 text-sm font-medium transition focus-visible:outline-2 focus-visible:outline-sky-600 ${menu === "profile" ? "bg-sky-50 text-sky-700" : "text-slate-600 hover:bg-slate-50"}`}><UserIcon />My Profile</button>
-            <button type="button" onClick={() => setMenu("result")} aria-current={menu === "result" ? "page" : undefined} className={`flex min-h-12 items-center gap-3 rounded-lg px-4 text-sm font-medium transition focus-visible:outline-2 focus-visible:outline-sky-600 ${menu === "result" ? "bg-sky-50 text-sky-700" : "text-slate-600 hover:bg-slate-50"}`}><ResultIcon />Result</button>
+            <button type="button" onClick={() => {setMenu("result"); setShowResultTable(false);}} aria-current={menu === "result" ? "page" : undefined} className={`flex min-h-12 items-center gap-3 rounded-lg px-4 text-sm font-medium transition focus-visible:outline-2 focus-visible:outline-sky-600 ${menu === "result" ? "bg-sky-50 text-sky-700" : "text-slate-600 hover:bg-slate-50"}`}><ResultIcon />Result</button>
           </div>
         </nav>
       </aside>
@@ -52,12 +54,12 @@ export default function GuardianDashboard({ account, busy, message, onSignOut, o
         <div className="mx-auto max-w-7xl p-4 sm:p-7">
           {message && <p role="alert" className="mb-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{message}</p>}
 
-          {menu === "result" ? <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(250px,1fr)]">
+          {menu === "result" ? showResultTable ? <GuardianResultTable reports={account.results} onSelectResult={onSelectResult} onBack={() => setShowResultTable(false)} /> : <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(250px,1fr)]">
             <section className="min-w-0 rounded-lg border border-slate-200 bg-white shadow-sm">
               <div className="border-b border-slate-100 px-5 py-4"><span className="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">{account.results.length} result{account.results.length === 1 ? "" : "s"} found</span></div>
               <div className="p-5 sm:p-6">
-                <div className="flex items-center gap-4"><div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-600"><UserIcon className="h-6 w-6" /></div><div className="min-w-0"><h2 className="break-words text-sm font-semibold uppercase text-blue-950">{account.pupil.name}</h2><p className="mt-1 text-xs text-slate-500">{currentClass ? `Class: ${currentClass}` : "Registered pupil"}</p></div></div>
-                {account.results.length ? <div className="mt-6 divide-y divide-slate-100">{account.results.map(report => <div key={report.id} className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><p className="break-words text-sm font-medium">{report.class_name} <span className="text-slate-300">/</span> {report.term}</p>{!report.class_name.startsWith("Nursery") && <p className="mt-1 text-xs text-slate-500">Average: {report.average_score}%</p>}</div>{report.assessment_data ? <button type="button" onClick={() => onSelectResult(report)} className="flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600"><ResultIcon />Check Result</button> : <p className="text-xs text-slate-500">Full report unavailable</p>}</div>)}</div> : <p className="mt-6 rounded-lg bg-slate-50 p-4 text-sm leading-6 text-slate-500">No results have been uploaded for your child yet. Please check again after the school publishes their report.</p>}
+                <div className="flex items-center gap-4"><div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-600"><UserIcon className="h-6 w-6" /></div><div className="min-w-0"><h2 className="break-words text-sm font-semibold uppercase text-blue-950">{account.pupil.name}</h2></div></div>
+                <button type="button" onClick={() => setShowResultTable(true)} className="mt-5 flex min-h-11 items-center justify-center gap-2 rounded-md bg-sky-600 px-5 py-2 text-sm font-medium text-white hover:bg-sky-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600"><ResultIcon />Check Result</button>
               </div>
             </section>
 
