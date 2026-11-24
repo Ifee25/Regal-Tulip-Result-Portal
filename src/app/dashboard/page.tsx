@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { resultSession, matchesResultFilters } from "@/lib/resultFilters";
 import { findSelectedPupil } from "@/lib/pupilSelection";
 import { getBrowserSupabase } from "@/lib/supabaseClient";
 import { clearAdminSession } from "@/lib/adminAuth";
@@ -48,6 +49,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [resultsMessage, setResultsMessage] = useState<string | null>(null);
   const [resultsArmFilter, setResultsArmFilter] = useState("All");
+  const [resultsSessionFilter, setResultsSessionFilter] = useState("All");
+  const [resultsTermFilter, setResultsTermFilter] = useState("All");
   const [showArmSummary, setShowArmSummary] = useState(false);
   const [form, setForm] = useState({ student_name: "", session: "2025/2026" });
   const [selectedTerm, setSelectedTerm] = useState(termOptions[0].value);
@@ -707,9 +710,10 @@ export default function DashboardPage() {
     if (className) counts[className] = (counts[className] ?? 0) + 1;
     return counts;
   }, {});
-  const filteredResults = isAdmin && resultsArmFilter !== "All"
-    ? results.filter((row) => row.class_name === resultsArmFilter)
-    : results;
+  const resultSessionOptions = Array.from(new Set([...sessionOptions, ...results.map(resultSession).filter(Boolean)])).sort().reverse();
+  const filteredResults = results.filter(row => matchesResultFilters(row, {
+    className: isAdmin ? resultsArmFilter : "All", session: resultsSessionFilter, term: resultsTermFilter,
+  }));
   const summaryAssessments = filteredResults.map((row) => ({
     row,
     assessment: (() => {
@@ -1076,39 +1080,37 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {isAdmin && (
-              <div className="mt-5 flex flex-col gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-end sm:justify-between">
-                <label className="block w-full sm:max-w-xs">
-                  <span className="mb-1 block text-sm font-semibold text-slate-700">View uploads by class arm</span>
-                  <select
-                    value={resultsArmFilter}
-                    onChange={(event) => {
-                      setResultsArmFilter(event.target.value);
-                      setShowArmSummary(false);
-                    }}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
-                  >
-                    <option value="All">All class arms ({results.length})</option>
-                    {allClassOptions.map((className) => (
-                      <option key={className} value={className}>
-                        {className} ({armUploadCounts[className] ?? 0})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <p className="text-sm text-slate-600">
-                  Showing {filteredResults.length} upload{filteredResults.length === 1 ? "" : "s"}
-                  {resultsArmFilter === "All" ? " across all arms" : ` for ${resultsArmFilter}`}.
-                </p>
-                {resultsArmFilter !== "All" && (
-                  <div className="no-print flex flex-wrap gap-2">
-                    <button type="button" onClick={() => setShowArmSummary((shown) => !shown)} className="rounded-lg border border-sky-700 px-3 py-2 text-sm font-semibold text-sky-800 hover:bg-sky-50">
-                      {showArmSummary ? "Hide summary" : "View spreadsheet summary"}
-                    </button>
-                  </div>
-                )}
+            <div className="mt-5 grid grid-cols-1 gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-3">
+              {isAdmin && <label className="min-w-0">
+                <span className="mb-2 block text-sm font-semibold text-slate-700">Class arm</span>
+                <select value={resultsArmFilter} onChange={event => {setResultsArmFilter(event.target.value); setShowArmSummary(false);}} className="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-base outline-none focus:border-sky-500">
+                  <option value="All">All class arms</option>
+                  {allClassOptions.map(name => <option key={name} value={name}>{name} ({armUploadCounts[name] ?? 0})</option>)}
+                </select>
+              </label>}
+              <label className="min-w-0">
+                <span className="mb-2 block text-sm font-semibold text-slate-700">Session</span>
+                <select value={resultsSessionFilter} onChange={event => setResultsSessionFilter(event.target.value)} className="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-base outline-none focus:border-sky-500">
+                  <option value="All">All sessions</option>
+                  {resultSessionOptions.map(session => <option key={session} value={session}>{session}</option>)}
+                  {results.some(row => !resultSession(row)) && <option value="Unspecified">Session not recorded</option>}
+                </select>
+              </label>
+              <label className="min-w-0">
+                <span className="mb-2 block text-sm font-semibold text-slate-700">Term</span>
+                <select value={resultsTermFilter} onChange={event => setResultsTermFilter(event.target.value)} className="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-base outline-none focus:border-sky-500">
+                  <option value="All">All terms</option>
+                  {termOptions.map(term => <option key={term.value} value={term.value}>{term.label}</option>)}
+                </select>
+              </label>
+              <div className="flex flex-wrap items-center justify-between gap-3 sm:col-span-2 lg:col-span-3">
+                <p role="status" className="text-sm text-slate-600">Showing {filteredResults.length} of {results.length} results.</p>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={() => {setResultsArmFilter("All"); setResultsSessionFilter("All"); setResultsTermFilter("All"); setShowArmSummary(false);}} className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700">Clear filters</button>
+                  {isAdmin && resultsArmFilter !== "All" && <button type="button" onClick={() => setShowArmSummary(shown => !shown)} className="min-h-11 rounded-lg border border-sky-700 px-3 py-2 text-sm font-semibold text-sky-800">{showArmSummary ? "Hide summary" : "View spreadsheet summary"}</button>}
+                </div>
               </div>
-            )}
+            </div>
 
             {isAdmin && resultsArmFilter !== "All" && showArmSummary && (
               <div className="mt-5">
@@ -1154,7 +1156,7 @@ export default function DashboardPage() {
                     <tr>
                       <th className="px-4 py-3 text-left font-semibold text-slate-600">Student</th>
                       <th className="px-4 py-3 text-left font-semibold text-slate-600">Class</th>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-600">Term</th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-600">Session</th><th className="px-4 py-3 text-left font-semibold text-slate-600">Term</th>
                       <th className="px-4 py-3 text-left font-semibold text-slate-600">Average</th>
                       <th className="px-4 py-3 text-right font-semibold text-slate-600">Actions</th>
                     </tr>
@@ -1162,8 +1164,8 @@ export default function DashboardPage() {
                   <tbody className="divide-y divide-slate-100 bg-white">
                     {filteredResults.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="px-4 py-10 text-center text-slate-500">
-                          {resultsArmFilter === "All" ? "No results have been uploaded yet." : `No results have been uploaded for ${resultsArmFilter}.`}
+                        <td colSpan={6} className="px-4 py-10 text-center text-slate-500">
+                          {results.length ? "No results match these filters. Try another session or term, or clear the filters." : "No results have been uploaded yet."}
                         </td>
                       </tr>
                     )}
@@ -1183,6 +1185,7 @@ export default function DashboardPage() {
                         <td className="px-4 py-3">
                           {r.class_name}
                         </td>
+                        <td className="px-4 py-3">{resultSession(r) || "Not recorded"}</td>
                         <td className="px-4 py-3">
                           {r.term}
                         </td>
