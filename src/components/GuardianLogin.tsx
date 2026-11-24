@@ -33,29 +33,15 @@ export default function GuardianLogin({ phone, reg, busy, message, onPhoneChange
       </header>
 
       <div className="my-8 grid overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-xl shadow-blue-950/10 sm:my-10 lg:min-h-[690px] lg:grid-cols-[1.05fr_1fr]">
-        <section className="relative isolate overflow-hidden bg-blue-950 px-7 py-10 text-white sm:px-10 sm:py-12 lg:flex lg:flex-col lg:justify-between lg:p-14">
+        <section className="relative isolate overflow-hidden bg-blue-950 px-7 py-10 text-white sm:px-10 sm:py-12 flex items-center justify-center lg:p-14">
           <div aria-hidden="true" className="pointer-events-none absolute -right-44 -top-52 -z-10 h-[560px] w-[560px] rounded-full border border-white/[0.07]" />
           <div aria-hidden="true" className="pointer-events-none absolute -bottom-80 -left-36 -z-10 h-[650px] w-[650px] rounded-full border-[90px] border-white/[0.025]" />
-          <div>
-            <p className="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.25em] text-sky-200"><span className="h-px w-7 bg-amber-400" />A partnership in learning</p>
-            <h1 className="mt-7 max-w-md font-serif text-[38px] leading-[1.12] tracking-tight sm:text-5xl lg:text-[58px]">Every step forward.<br /><span className="text-sky-200">Every reason<br className="hidden lg:block" /> to be proud.</span></h1>
-            <p className="mt-6 max-w-sm text-sm leading-7 text-slate-200 sm:text-base">Stay close to your child&apos;s learning journey. View their results, celebrate their progress, and prepare for what comes next.</p>
-          </div>
-
-          <div className="mt-10 hidden sm:block lg:mt-12" aria-hidden="true">
-            <div className="max-w-sm rounded-2xl border border-white/15 bg-white/[0.05] p-5">
-              <div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl border border-sky-300/20 bg-sky-300/10 text-sky-200"><svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h5" /></svg></div><div><p className="text-sm font-medium">A clearer view of their progress</p><p className="mt-1 text-xs text-sky-100">Term results, thoughtfully brought together</p></div></div>
-              <div className="mt-5 grid grid-cols-3 gap-2">{["Discover", "Encourage", "Celebrate"].map((word, index) => <div key={word} className="border-t border-white/15 pt-3"><p className="font-serif text-lg text-sky-200">0{index + 1}</p><p className="mt-1 text-xs text-slate-200">{word}</p></div>)}</div>
-            </div>
-          </div>
-          <p className="mt-8 flex items-center gap-2 text-xs tracking-wide text-sky-100"><LockIcon />Private access to your child&apos;s results</p>
+          <p className="max-w-md font-serif text-3xl leading-snug tracking-tight text-sky-100 sm:text-4xl lg:text-5xl">Every child grows stronger with your support.</p>
         </section>
 
         <section className="px-6 py-9 sm:px-12 sm:py-12 lg:flex lg:items-center lg:px-14">
           <div className="mx-auto w-full max-w-md">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-600">Welcome to your parent portal</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">A little closer to<br className="hidden sm:block" /> their school day.</h2>
-            <p className="mt-4 text-sm leading-6 text-slate-600">Sign in with the details provided when your child was registered.</p>
+            <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Welcome</h1>
 
             <form onSubmit={onSubmit} className="mt-8 space-y-5" aria-busy={busy}>
               <div><label htmlFor="guardian-number" className="text-sm font-semibold">Guardian Number</label><input id="guardian-number" name="guardian_number" type="tel" autoComplete="tel" required maxLength={50} disabled={busy} value={phone} onChange={event => onPhoneChange(event.target.value)} placeholder="Enter your registered phone number" aria-describedby="guardian-number-hint" className={fieldClass} /><p id="guardian-number-hint" className="mt-2 text-xs leading-5 text-slate-500">The guardian phone number on your child&apos;s registration.</p></div>
