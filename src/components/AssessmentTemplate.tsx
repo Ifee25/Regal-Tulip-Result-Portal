@@ -244,7 +244,7 @@ export default function AssessmentTemplate({ reg_no, pupil_id, student_name, ses
             <div className="paired"><b>HEIGHT:</b><label>H1 (cm):<input value={info.heightStart} onChange={(e) => updateInfo("heightStart", e.target.value)} /></label><label>H2 (cm):<input value={info.heightEnd} onChange={(e) => updateInfo("heightEnd", e.target.value)} /></label></div>
           </div>
           <div className="header-lines second-header-line">
-            <label>REG NO: {reg_no ?? initialResult?.reg_no ?? ""}</label><label className="name-field">NAME:<input value={student_name} disabled /></label>
+            <label className="name-field">NAME:<input value={student_name} disabled /></label>
             <label>NURSERY:<input value={class_name} disabled /></label>
             <label>AGE:<input value={info.age} onChange={(e) => updateInfo("age", e.target.value)} /></label>
             <div className="paired"><b>WEIGHT</b><label>W1 (kg):<input value={info.weightStart} onChange={(e) => updateInfo("weightStart", e.target.value)} /></label><label>W2 (kg):<input value={info.weightEnd} onChange={(e) => updateInfo("weightEnd", e.target.value)} /></label></div>

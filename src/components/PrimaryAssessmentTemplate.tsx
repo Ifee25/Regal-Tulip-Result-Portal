@@ -221,7 +221,7 @@ export default function PrimaryAssessmentTemplate({ reg_no, pupil_id, student_na
             </header>
 
             <div className="mt-5 grid grid-cols-[2.1fr_1fr_.9fr_1.25fr_1fr_1.2fr] gap-2">
-              <label className="flex"><b>NAME:</b><span className="flex-1 border-b border-dotted border-black px-1">{student_name}</span><span className="ml-3 whitespace-nowrap">REG NO: {reg_no ?? initialResult?.reg_no ?? ""}</span></label>
+              <label className="flex"><b>NAME:</b><span className="flex-1 border-b border-dotted border-black px-1">{student_name}</span></label>
               <label className="flex"><b>CLASS:</b><span className="flex-1 border-b border-dotted border-black px-1">{class_name}</span></label>
               {lineInput("age", "AGE:")}{lineInput("averageAge", "AVERAGE AGE:")}
               <label className="flex"><b>TERM:</b><span className="flex-1 border-b border-dotted border-black px-1">{term}</span></label>
